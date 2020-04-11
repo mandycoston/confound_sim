@@ -1,0 +1,184 @@
+---
+title: "Low-Dimensional Synthetic Experiments for Predictions with Runtime Confounding"
+output: html_notebook
+---
+
+
+
+```{r}
+library(tidyverse)
+library(np)
+library(glue)
+source("utils.R")
+```
+
+```{r}
+compute_mu <- function(v,z){
+  return(.005*v + .5*z + .2)
+}
+
+# inputs: predictor v 
+# returns a number in [0,1]
+compute_nu <- function(v, c) {
+  p1 <- compute_mu(v, 1)*(c*sigmoid(v)+(1-c)*.5)
+  p0 <- compute_mu(v, 0)*(1-(c*sigmoid(v)+(1-c)*.5))
+  return(p1 + p0)
+}
+```
+
+```{r}
+set.seed(99)
+n <- 10000
+num <- 0
+# visualize how conf model changes as we vary c in [0,1]
+#for (c in (seq(0, 1, .1))) { 
+c <- .4 
+a1 <- c(-2, .1, 4)
+#a2 <- c(-2, .05, 5)
+a <- a1
+prop_cutoff <- 0.95
+
+v1 <- rnorm(n = n, mean = 0, sd = 10)
+z1 <- rbinom(n = n, size =1, prob = c*sigmoid(v1)+(1-c)*.5)
+prop <- sigmoid(as.numeric(as.matrix(cbind(1, v1, z1)) %*% a))
+A <- rbinom(n = n, size = 1, prob = prop)
+
+#cor(z1, v1, method = "spearman")
+
+tibble(v1 = v1, 
+       z1 = z1, 
+       prop = prop,
+       A = A) -> df
+
+# regression models
+df %>%
+  dplyr::mutate(mu = purrr::pmap_dbl(list(v1, z1), compute_mu),
+                nu = purrr::pmap_dbl(list(v1, c), compute_nu)) -> df
+
+mean((df$mu - df$nu)^2) #is this too small of a difference?
+
+train <- rbinom(n = n, size = 1, prob = .5)
+
+df %>% 
+  dplyr::mutate(partition = if_else(train == 1, "train", "test"),
+                y0 = rbinom(n = n, size = 1, prob = mu),
+                y0cat = if_else(y0 == 1, "one", "zero")) -> df
+
+df %>%
+  dplyr::filter(prop < prop_cutoff) -> df
+
+# Stage 1
+# simulate noise for nuisance functions
+
+#for(eps_n_exp in c(.9, .75, .5, .4, .3, .25,  .15, .1)) {
+#for (eps_sd in c(1, 2, 5, 10, 20, 50)) {
+eps_n_exp <- 0.25
+eps_sd <- 1
+num <- num + 1
+# create pseudo outcomes (in lieu of first stage)
+
+eps_mu <- rnorm(nrow(df), mean = 0, sd = eps_sd)/(nrow(df)^(eps_n_exp))
+eps_pi <- rnorm(nrow(df), mean = 0, sd = eps_sd)/(nrow(df)^(eps_n_exp))
+
+df %>% 
+  dplyr::mutate(mueps = sigmoid(logit(mu) + eps_mu),
+                propeps = sigmoid(logit(prop) + eps_pi),
+                bceps = mueps + (1-A)/(1-propeps)*(y0-mueps)) -> df
+
+# Stage 2: regress on V
+# regress plugin
+bw_pl <- np::npregbw(formula = mueps ~ v1, data = select(filter(df, partition == "train"), 
+                                         mueps, v1))
+
+reg_pl <- np::npreg(bws = bw_pl,
+                    data = select(filter(df, partition == "train"), 
+                                         mueps, v1), 
+                    newdata = select(filter(df, partition == "test"), 
+                                         mueps, v1),
+                    y.eval = TRUE)
+
+# regress bias-corrected
+bw_bc <- np::npregbw(formula = bceps ~ v1, data = select(filter(df, 
+                                                                partition == "train"), 
+                                         bceps, v1))
+
+reg_bc <- np::npreg(bws = bw_bc,
+                    data = select(filter(df, partition == "train"), 
+                                         bceps, v1), 
+                    newdata = select(filter(df, partition == "test"), 
+                                         bceps, v1),
+                    y.eval = TRUE)
+
+# regress confounded
+bw_conf <- np::npregbw(formula = y0 ~ v1, data = select(filter(df, 
+                                                               partition == "train", 
+                                                               A == 0), 
+                                         y0, v1))
+
+reg_conf <- np::npreg(bws = bw_conf,
+                    data = select(filter(df, 
+                                         partition == "train", 
+                                         A == 0), 
+                                  y0, v1), 
+                    newdata = select(filter(df, 
+                                            partition == "test", 
+                                            A == 0), 
+                                         y0, v1),
+                    y.eval = TRUE)
+
+df %>% 
+  dplyr::mutate(pl = predict(reg_pl, newdata = df),
+                bc = predict(reg_bc, newdata = df),
+                conf = predict(reg_conf, newdata = df),
+                const = mean(filter(df, partition == "train", A == 0)$y0)) -> df
+
+df %>%
+  dplyr::filter(partition == "test") -> test
+
+
+mse_pl <- compute_mse(preds = test$pl, label = test$nu)
+mse_bc <- compute_mse(preds = test$bc, label = test$nu)
+mse_conf <- compute_mse(preds = test$conf, label = test$nu)
+mse_const <- compute_mse(preds = test$const, label = test$nu)
+mse <- tibble("method" = c("constant", "confounded", "plug-in", "bias-corrected"),
+              "mse" = c(mse_const$mse, mse_conf$mse, mse_pl$mse, mse_bc$mse),
+              "low" = c(mse_const$low, mse_conf$low, mse_pl$low, mse_bc$low), 
+              "high" = c(mse_const$high, mse_conf$high, mse_pl$high, mse_bc$high),
+              "eps_n_exp" = eps_n_exp, 
+              "eps_sd" = eps_sd, 
+              "c" = c,
+              "a" = toString(a),
+              "prop_cutoff" = prop_cutoff
+              )
+
+# save the mse tables to files
+#saveRDS(mse, glue::glue("results/prop{prop_cutoff*100}/error/mse{num}.Rds"))
+
+ # }
+#}
+```
+
+```{r}
+prop_cutoff <- .95
+num <- 41
+mse_all <- readRDS(glue::glue("results/prop{prop_cutoff*100}/error/mse{num}.Rds"))
+
+for (i in c(1:(num-1))){
+  mse_all <- rbind(mse_all, readRDS(glue::glue("results/prop{prop_cutoff*100}/error/mse{i}.Rds")))
+}
+
+mse_all %>%
+  dplyr::filter(eps_n_exp == .25, 
+                eps_sd == 1) -> mse_sim
+```
+
+
+```{r}
+mse_sim
+```
+
+```{r}
+mse_all %>%
+  dplyr::filter(eps_n_exp == .25, 
+                eps_sd == 5)
+```
