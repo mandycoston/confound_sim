@@ -4,23 +4,38 @@ output: html_notebook
 ---
 ```{r}
 library(tidyverse)
+source("regression_functions.R")
+source("utils.R")
 ```
 
 ```{r}
-res <- readRDS(glue::glue("results/prop{prop_cutoff*100}/sim{n_sim}.Rds"))
+# n_sim <- 10
+prop_cutoff <- 1
+sd_v1 <- 10
+c <- 0.4
 
-for (i in c(1:(n_sim - 1))) {
-  res <- rbind(res, readRDS(glue::glue("results/prop{prop_cutoff*100}/sim{i}.Rds")))
-}
+# create a test set to be used for all simulations
+v <- seq(-30, 30, .01)
+test <- tibble(
+  v1 = v,
+  nu = compute_nu(v, c)
+)
+
+n_test <- nrow(test)
+
+fl <- list.files("results/prop100/plugin/")
+setwd("results/prop100/plugin/")
+res <- dplyr::bind_rows(lapply(fl, readRDS))
 
 res %>%
+  dplyr::filter(sim_num != 11) %>%
   dplyr::group_by(eps_n_exp, eps_sd, method, nu, v1) %>%
   dplyr::summarise(variance = var(pred),
                    bias = mean(pred) - mean(nu),
                    pred = mean(pred)
                    ) -> res_agg
 
-total_w <- sum(dnorm(test$v1, mean = , sd = sd_v1))
+total_w <- sum(dnorm(test$v1, mean = 0, sd = sd_v1))
 res_agg %>% 
   dplyr::mutate(sqerr = bias^2 + variance,
     w = dnorm(v1, mean = 0, sd = sd_v1)/total_w) -> res_agg
@@ -28,23 +43,45 @@ res_agg %>%
 res_agg %>% 
   dplyr::ungroup() %>%
   dplyr::group_by(eps_n_exp, eps_sd, method) %>%
-  dplyr::summarise(mse = mean(w*sqerr),
-                vse = var(w*sqerr)) %>%
-  dplyr::mutate(low = mse - 1.96 *sqrt(vse/n_test),
-                high = mse + 1.96 *sqrt(vse/n_test)
+  dplyr::summarise(mse = sum(w*sqerr),
+                vse = n_test * var(w*sqerr)) %>%
+  dplyr::mutate(low = mse - 1.96 *sqrt(vse),
+                high = mse + 1.96 *sqrt(vse)
                 )-> res_sum
+```
+
+```{r}
+res_agg %>% 
+  dplyr::filter(method == "const", eps_n_exp == 0, eps_sd == 0) %>%
+  ggplot(aes(x = v1, y = sqerr)) + geom_point()
 ```
 
 
 ```{r}
 res_agg %>% 
-  dplyr::filter(method == "bc", eps_sd == 0.1, eps_n_exp == .25) %>%
+  dplyr::group_by(method, eps_n_exp, eps_sd) %>%
+  summarise(min_sqerr = min(sqerr),
+            max_sqerr = max(sqerr),
+            median_sqerr = median(sqerr),
+            unweight_sqerr = mean(sqerr))
+```
+
+
+```{r}
+res_agg %>% 
+  dplyr::filter(method == "pl", eps_sd == 1, eps_n_exp == .25) %>% 
   dplyr::pull(w) %>% sum()
 ```
 
 ```{r}
 res_sum %>%
-    ggplot(aes(x=eps_n_exp, y= mse, color = method, fill = method))  + geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4)+ geom_point()+ ylab('Mean Squared Error') + facet_grid(eps_sd ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+  dplyr::filter(method == "pl") %>%
+    ggplot(aes(x=eps_n_exp, y= mse, color = method, fill = method))  +
+  geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4) + 
+  geom_point() + 
+  ylab('Mean Squared Error') + 
+  facet_grid(eps_sd ~.)  + 
+  theme_grey(base_size=12)    + theme(legend.position = "bottom") 
 
 ```
 
@@ -56,10 +93,18 @@ res_sum %>%
 
 ```{r}
 res_agg %>%
-  dplyr::filter(eps_sd == .1, eps_n_exp == .15) %>%
+  dplyr::filter(eps_sd == 10, eps_n_exp == .1) %>%
    ggplot(aes(x = nu, y = pred, color = method, fill = method)) + geom_point()+ geom_abline(slope= 1, intercept = 0)  + facet_grid(eps_sd ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
 ```
 
+```{r}
+res_agg %>%
+   ggplot(aes(x = nu, y = pred, color = method, fill = method)) +
+  geom_point()+
+  geom_abline(slope= 1, intercept = 0)  +
+  facet_grid(eps_sd ~ eps_n_exp)  + 
+  theme_grey(base_size=12)  + theme(legend.position = "bottom") 
+```
 
 ```{r}
 res_agg %>%
