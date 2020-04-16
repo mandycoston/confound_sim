@@ -6,109 +6,88 @@ output: html_notebook
 library(tidyverse)
 ```
 
-
 ```{r}
-prop_cutoff <- .95
-num <- 12
-mse_all1 <- readRDS(glue::glue("results/prop{prop_cutoff*100}/mse{num}.Rds"))
+res <- readRDS(glue::glue("results/prop{prop_cutoff*100}/sim{n_sim}.Rds"))
 
-for (i in c(0:(num-1))){
-  mse_all1 <- rbind(mse_all1, readRDS(glue::glue("results/prop{prop_cutoff*100}/mse{i}.Rds")))
+for (i in c(1:(n_sim - 1))) {
+  res <- rbind(res, readRDS(glue::glue("results/prop{prop_cutoff*100}/sim{i}.Rds")))
 }
 
-mse_all1 %>%
-  dplyr::filter(eps_n_exp == .25,
-                eps_sd == 5) -> mse_sim1
+res %>%
+  dplyr::group_by(eps_n_exp, eps_sd, method, nu, v1) %>%
+  dplyr::summarise(variance = var(pred),
+                   bias = mean(pred) - mean(nu),
+                   pred = mean(pred)
+                   ) -> res_agg
 
-```
- 
- > Don't see much of a difference as we vary the noise
- 
+total_w <- sum(dnorm(test$v1, mean = , sd = sd_v1))
+res_agg %>% 
+  dplyr::mutate(sqerr = bias^2 + variance,
+    w = dnorm(v1, mean = 0, sd = sd_v1)/total_w) -> res_agg
 
-
-```{r}
-mse_all %>%
-  ggplot(aes(x=eps_n_exp, y= mse, color = method, fill = method))  + geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4)+ geom_line()+ ylab('Mean Squared Error') + facet_grid(eps_sd ~.) + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
-
-```
-```{r}
-filter(mse_all, eps_n_exp == .3) %>%
-  ggplot(aes(x=eps_sd, y= mse, color = method, fill = method)) + geom_line()+ ylab('Mean Squared Error')  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
-```
-
-> Vary c
-
-
-```{r}
-prop_cutoff <- .95
-num <- 11
-mse_all <- readRDS(glue::glue("results/prop{prop_cutoff*100}/c/mse{num}.Rds"))
-
-for (i in c(1:(num-1))){
-  mse_all <- rbind(mse_all, readRDS(glue::glue("results/prop{prop_cutoff*100}/c/mse{i}.Rds")))
-}
-
-```
-
-```{r}
-mse_all %>%
-  ggplot(aes(x=c, y= mse, color = method, fill = method))  + geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4)+ geom_line()+ ylab('Mean Squared Error')  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
-```
-
-
-> Vary error much more over a wide range of variances and exponents 
-
-```{r}
-prop_cutoff <- .95
-num <- 41
-mse_all <- readRDS(glue::glue("results/prop{prop_cutoff*100}/error/mse{num}.Rds"))
-
-for (i in c(1:(num-1))){
-  mse_all <- rbind(mse_all, readRDS(glue::glue("results/prop{prop_cutoff*100}/error/mse{i}.Rds")))
-}
-
-```
-
-```{r}
-mse_all %>%
-  dplyr::filter(eps_n_exp >= .2,
-                eps_sd <= 5,
-                method %in% c("plug-in", "bias-corrected")) %>%
-  ggplot(aes(x=eps_sd, y= mse, color = method, fill = method))  + geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4)+ geom_line()+ facet_grid(eps_n_exp~.) + ylab('Mean Squared Error') + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
-
-```
-
-
-
-
-```{r}
-
+res_agg %>% 
+  dplyr::ungroup() %>%
+  dplyr::group_by(eps_n_exp, eps_sd, method) %>%
+  dplyr::summarise(mse = mean(w*sqerr),
+                vse = var(w*sqerr)) %>%
+  dplyr::mutate(low = mse - 1.96 *sqrt(vse/n_test),
+                high = mse + 1.96 *sqrt(vse/n_test)
+                )-> res_sum
 ```
 
 
 ```{r}
-mse_all %>%
-  dplyr::filter(eps_sd <= 10,
-                method %in% c("plug-in", "bias-corrected")) %>%
-  ggplot(aes(x=eps_sd, y= mse, color = method, fill = method))  + geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4)+ geom_line()+ facet_grid(eps_n_exp~.) + ylab('Mean Squared Error') + theme_grey(base_size=12)   + theme(legend.position = "bottom") 
+res_agg %>% 
+  dplyr::filter(method == "bc", eps_sd == 0.1, eps_n_exp == .25) %>%
+  dplyr::pull(w) %>% sum()
+```
+
+```{r}
+res_sum %>%
+    ggplot(aes(x=eps_n_exp, y= mse, color = method, fill = method))  + geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4)+ geom_point()+ ylab('Mean Squared Error') + facet_grid(eps_sd ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
 
 ```
 
- same data, different display
- 
 ```{r}
-mse_all %>%
-  dplyr::filter(eps_n_exp >= .2,
-                eps_sd <= 5,
-                method %in% c("plug-in", "bias-corrected")) %>%
-  ggplot(aes(x=eps_n_exp, y= mse, color = method, fill = method))  + geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4)+ geom_line()+ facet_grid(eps_sd~.) + ylab('Mean Squared Error') + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+res_sum %>%
+    ggplot(aes(x=eps_sd, y= mse, color = method, fill = method))  + geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4)+ geom_point()+ ylab('Mean Squared Error') + facet_grid(eps_n_exp ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
 
-```  
+```
 
-
-
-
-
+```{r}
+res_agg %>%
+  dplyr::filter(eps_sd == .1, eps_n_exp == .15) %>%
+   ggplot(aes(x = nu, y = pred, color = method, fill = method)) + geom_point()+ geom_abline(slope= 1, intercept = 0)  + facet_grid(eps_sd ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+```
 
 
+```{r}
+res_agg %>%
+  dplyr::filter(eps_sd == .5, method != "conf") %>%
+   ggplot(aes(x = v1, y = bias^2, color = method, fill = method)) + geom_point()+ ylab('Bias Sq') + facet_grid(eps_n_exp ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+
+```
+
+```{r}
+res_agg %>%
+  dplyr::filter(eps_sd == .1, eps_n_exp == .25) %>%
+   ggplot(aes(x=v1, y= variance, color = method, fill = method)) + geom_point()+ ylab('Variance') + facet_grid(eps_sd ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+
+```
+
+```{r}
+res_agg %>%
+  dplyr::filter(eps_sd == .1, eps_n_exp == .25) %>%
+   ggplot(aes(x=v1, y= sqerr, color = method, fill = method)) + geom_point()+ ylab('Squared Error') + facet_grid(eps_sd ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+
+```
+
+> Performance at the mean
+
+```{r}
+res_agg %>%
+  dplyr::filter(v1 == 0, eps_sd < 5) %>% 
+   ggplot(aes(x=eps_n_exp, y= sqerr, color = method, fill = method)) + geom_point()+ ylab('Mean Squared Error') + facet_grid(eps_sd ~.) +ylim(c(0, 0.0075)) + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+
+```
 

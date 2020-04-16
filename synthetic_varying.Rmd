@@ -7,6 +7,7 @@ output: html_notebook
 library(tidyverse)
 library(np)
 library(glue)
+library(doParallel)
 source("utils.R")
 ```
 
@@ -25,10 +26,11 @@ compute_nu <- function(v, c) {
 ```
 
 ```{r}
+start_time <- Sys.time()
 set.seed(99)
 
 # number of simulations
-n_sim <- 2 #500
+n_sim <- 10
 
 # number of training points in each simulation
 n <- 5000
@@ -46,7 +48,7 @@ a <- a1
 
 # discard all training points with propensity higher
 # than prop_cutoff
-prop_cutoff <- 0.95
+prop_cutoff <- 1#0.95
 
 # create a test set to be used for all simulations
 v <- seq(-30, 30, .01)
@@ -56,8 +58,12 @@ test <- tibble(
 )
 
 n_test <- nrow(test)
+
+# parallelize 
+registerDoParallel(cores = 14)
+  
 # simulate
-for (sim in c(1:n_sim)) {
+foreach (sim=1:n_sim) %dopar% {
   v1 <- rnorm(n = n, mean = 0, sd = sd_v1)
   z1 <- rbinom(n = n, size = 1, prob = c * sigmoid(v1) + (1 - c) * .5)
   prop <- sigmoid(as.numeric(as.matrix(cbind(1, v1, z1)) %*% a))
@@ -99,26 +105,15 @@ for (sim in c(1:n_sim)) {
     "eps_sd" = numeric()
   )
   
-  # mse <- tibble(
-  #   "method" = character(),
-  #   "mse" = numeric(),
-  #   "low" = numeric(),
-  #   "high" = numeric(),
-  #   "eps_n_exp" = numeric(),
-  #   "eps_sd" = numeric(),
-  #   "c" = numeric(),
-  #   "a" = character(),
-  #   "prop_cutoff" = numeric()
-  # )
-
   # Stage 1
   # simulate noise for nuisance functions
-  # eps_n_exp <- 0.25
-  # eps_sd <- 1
-  # for (eps_n_exp in c(.5, .4, .3, .25, .2, .15, .1)) {
-  #   for (eps_sd in c(1, 2, 5)) {
-  for (eps_n_exp in c(.5, .4)) {
-    for (eps_sd in c(1, 2)) {
+  
+   # for (eps_n_exp in c(.5, .4, .3, .25, .2, .15, .1, 0.05)) {
+   #   for (eps_sd in c(.001, .1, .5, 1, 2, 5)) {
+   for (eps_n_exp in c(.5, .25, .2, .15, .1)) {
+     for (eps_sd in c(0, 5, 10, 25)) {
+        #for (eps_sd in c(0, .001, .1, .5, 1, 2, 5, 7, 10)) {
+
       # create pseudo outcomes (in lieu of first stage)
 
       eps_mu <- rnorm(nrow(df), mean = 0, sd = eps_sd) / (nrow(df)^(eps_n_exp))
@@ -183,14 +178,6 @@ for (sim in c(1:n_sim)) {
           y0, v1
         )
       )
-
-      # df %>%
-      #   dplyr::mutate(
-      #     pl = predict(reg_pl, newdata = df),
-      #     bc = predict(reg_bc, newdata = df),
-      #     conf = predict(reg_conf, newdata = df),
-      #     const = mean(filter(df, partition == "train", A == 0)$y0)
-      #   ) -> df
       
       test %>%
         dplyr::mutate(
@@ -210,80 +197,102 @@ for (sim in c(1:n_sim)) {
   "eps_n_exp" = eps_n_exp,
   "eps_sd" = eps_sd
 ))
-      # mse_pl <- compute_mse(preds = test$pl, label = test$nu)
-      # mse_bc <- compute_mse(preds = test$bc, label = test$nu)
-      # mse_conf <- compute_mse(preds = test$conf, label = test$nu)
-      # mse_const <- compute_mse(preds = test$const, label = test$nu)
-      # mse <- rbind(
-      #   mse,
-      #   tibble(
-      #     "method" = c("constant", "confounded", "plug-in", "bias-corrected"),
-      #     "mse" = c(mse_const$mse, mse_conf$mse, mse_pl$mse, mse_bc$mse),
-      #     "low" = c(mse_const$low, mse_conf$low, mse_pl$low, mse_bc$low),
-      #     "high" = c(mse_const$high, mse_conf$high, mse_pl$high, mse_bc$high),
-      #     "eps_n_exp" = eps_n_exp,
-      #     "eps_sd" = eps_sd,
-      #     "c" = c,
-      #     "a" = toString(a),
-      #     "prop_cutoff" = prop_cutoff
-      #   )
-      # )
     }
   }
+  
+  pred %>%
+    tidyr::pivot_longer(cols = pl:conf, names_to = "method", values_to = "pred") -> pred
+  pred_prev <- readRDS(glue::glue("results/prop{prop_cutoff*100}/sim{sim}.Rds"))
+  pred <- rbind(pred_prev, pred)
   # save the predictions to files
-  saveRDS(pred, glue::glue("results/prop{prop_cutoff*100}/sim{sim}.Rds"))
+  saveRDS(pred, glue::glue("results/prop{prop_cutoff*100}/sim{sim}_ext.Rds"))
 }
+task_time <- difftime(Sys.time(), start_time)
+print(task_time)
 ```
 
 ```{r}
-prop_cutoff <- .95
-res <- readRDS(glue::glue("results/prop{prop_cutoff*100}/sim{sim}.Rds"))
+res <- readRDS(glue::glue("results/prop{prop_cutoff*100}/sim{n_sim}.Rds"))
 
-for (i in c(1:(sim - 1))) {
+for (i in c(1:(n_sim - 1))) {
   res <- rbind(res, readRDS(glue::glue("results/prop{prop_cutoff*100}/sim{i}.Rds")))
 }
 
 res %>%
-  dplyr::group_by(eps_n_exp, eps_sd, v1) %>%
-  dplyr::summarise(var_pl = var(pl),
-                   var_bc = var(bc),
-                   var_conf = var(conf),
-                   # mean_pl = mean(pl),
-                   # mean_bc = mean(bc),
-                   # mean_conf = mean(conf),
-                   # nu = mean(nu),
-                   bias_pl = mean(pl) - mean(nu),
-                   bias_bc = mean(bc) - mean(nu),
-                   bias_conf = mean(conf) - mean(nu),
-                   ) -> results
+  dplyr::group_by(eps_n_exp, eps_sd, method, nu, v1) %>%
+  dplyr::summarise(variance = var(pred),
+                   bias = mean(pred) - mean(nu),
+                   pred = mean(pred)
+                   ) -> res_agg
 
-results %>% 
-  dplyr::mutate(sqerr_pl = bias_pl^2 + var_pl, 
-                sqerr_bc = bias_bc^2 + var_bc, 
-                sqerr_conf = bias_conf^2 + var_conf, 
-    w = dnorm(v1, mean = 0, sd = sd_v1)) -> results
+total_w <- sum(dnorm(test$v1, mean = , sd = sd_v1))
+res_agg %>% 
+  dplyr::mutate(sqerr = bias^2 + variance,
+    w = dnorm(v1, mean = 0, sd = sd_v1)/total_w) -> res_agg
 
-results %>% 
+res_agg %>% 
   dplyr::ungroup() %>%
-  dplyr::group_by(eps_n_exp, eps_sd) %>%
-  dplyr::summarise(mse_pl = mean(w*sqerr_pl),
-                mse_bc = mean(w*sqerr_bc),
-                mse_conf = mean(w*sqerr_conf),
-                vse_pl = var(w*sqerr_pl),
-                vse_bc = var(w*sqerr_bc),
-                vse_conf = var(w*sqerr_conf)) %>%
-  dplyr::mutate(low_pl = mse_pl - 1.96 *sqrt(vse_pl/n_test),
-                high_pl = mse_pl + 1.96 *sqrt(vse_pl/n_test),
-                low_bc = mse_bc - 1.96 *sqrt(vse_bc/n_test),
-                high_bc = mse_bc + 1.96 *sqrt(vse_bc/n_test),
-                low_conf = mse_conf - 1.96 *sqrt(vse_conf/n_test),
-                high_conf = mse_conf + 1.96 *sqrt(vse_conf/n_test))-> res_sum
+  dplyr::group_by(eps_n_exp, eps_sd, method) %>%
+  dplyr::summarise(mse = mean(w*sqerr),
+                vse = var(w*sqerr)) %>%
+  dplyr::mutate(low = mse - 1.96 *sqrt(vse/n_test),
+                high = mse + 1.96 *sqrt(vse/n_test)
+                )-> res_sum
+```
+
+
+```{r}
+res_agg %>% 
+  dplyr::filter(method == "bc", eps_sd == 0.1, eps_n_exp == .25) %>%
+  dplyr::pull(w) %>% sum()
 ```
 
 ```{r}
 res_sum %>%
-    ggplot(aes(x=eps_n_exp, y= mse, color = method, fill = method))  + geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4)+ geom_line()+ ylab('Mean Squared Error') + facet_grid(eps_sd ~.) + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+    ggplot(aes(x=eps_n_exp, y= mse, color = method, fill = method))  + geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4)+ geom_point()+ ylab('Mean Squared Error') + facet_grid(eps_sd ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
 
 ```
 
+```{r}
+res_sum %>%
+    ggplot(aes(x=eps_sd, y= mse, color = method, fill = method))  + geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4)+ geom_point()+ ylab('Mean Squared Error') + facet_grid(eps_n_exp ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+
+```
+
+```{r}
+res_agg %>%
+  dplyr::filter(eps_sd == .1, eps_n_exp == .15) %>%
+   ggplot(aes(x = nu, y = pred, color = method, fill = method)) + geom_point()+ geom_abline(slope= 1, intercept = 0)  + facet_grid(eps_sd ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+```
+
+
+```{r}
+res_agg %>%
+  dplyr::filter(eps_sd == .5, method != "conf") %>%
+   ggplot(aes(x = v1, y = bias^2, color = method, fill = method)) + geom_point()+ ylab('Bias Sq') + facet_grid(eps_n_exp ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+
+```
+
+```{r}
+res_agg %>%
+  dplyr::filter(eps_sd == .1, eps_n_exp == .25) %>%
+   ggplot(aes(x=v1, y= variance, color = method, fill = method)) + geom_point()+ ylab('Variance') + facet_grid(eps_sd ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+
+```
+
+```{r}
+res_agg %>%
+  dplyr::filter(eps_sd == .1, eps_n_exp == .25) %>%
+   ggplot(aes(x=v1, y= sqerr, color = method, fill = method)) + geom_point()+ ylab('Squared Error') + facet_grid(eps_sd ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+
+```
+
+> Performance at the mean
+
+```{r}
+res_agg %>%
+  dplyr::filter(v1 == 0, eps_sd < 5) %>% 
+   ggplot(aes(x=eps_n_exp, y= sqerr, color = method, fill = method)) + geom_point()+ ylab('Mean Squared Error') + facet_grid(eps_sd ~.) +ylim(c(0, 0.0075)) + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+
+```
 
