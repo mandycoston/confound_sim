@@ -10,187 +10,200 @@ library(tidyverse)
 library(np)
 library(glue)
 source("utils.R")
+source("regression_functions.R")
 ```
 
-```{r}
-compute_mu <- function(v,z){
-  return(.005*v + .5*z + .2)
-}
-
-# inputs: predictor v 
-# returns a number in [0,1]
-compute_nu <- function(v, c) {
-  p1 <- compute_mu(v, 1)*(c*sigmoid(v)+(1-c)*.5)
-  p0 <- compute_mu(v, 0)*(1-(c*sigmoid(v)+(1-c)*.5))
-  return(p1 + p0)
-}
-```
 
 ```{r}
 set.seed(99)
 n <- 15000
 num <- 0
 
-c <- .4 
-a1 <- c(-2, .1, 4)
-# a2 <- c(-2, .05, 5)
-a <- a1
-prop_cutoff <- 0.95
+c <- .4
 
-v1 <- rnorm(n = n, mean = 0, sd = 10)
-z1 <- rbinom(n = n, size =1, prob = c*sigmoid(v1)+(1-c)*.5)
+a <- c(1, .1, -2.75)
+prop_cutoff <- 1
+sd_v1 <- 10
+v1 <- rnorm(n = n, mean = 0, sd = sd_v1)
+z1 <- rbinom(n = n, size = 1, prob = c * sigmoid(v1) + (1 - c) * .5)
 prop <- sigmoid(as.numeric(as.matrix(cbind(1, v1, z1)) %*% a))
 A <- rbinom(n = n, size = 1, prob = prop)
 
-#cor(z1, v1, method = "spearman")
 
-tibble(v1 = v1, 
-       z1 = z1, 
-       prop = prop,
-       A = A) -> df
+tibble(
+  v1 = v1,
+  z1 = z1,
+  prop = prop,
+  A = A
+) -> df
 
 # regression models
 df %>%
-  dplyr::mutate(mu = purrr::pmap_dbl(list(v1, z1), compute_mu),
-                nu = purrr::pmap_dbl(list(v1, c), compute_nu)) -> df
-
-mean((df$mu - df$nu)^2) #is this too small of a difference?
+  dplyr::mutate(
+    mu = purrr::pmap_dbl(list(v1, z1), compute_mu),
+    nu = purrr::pmap_dbl(list(v1, c), compute_nu)
+  ) -> df
 
 train <- rbinom(n = n, size = 1, prob = .33)
 nuis <- rbinom(n = n, size = 1, prob = .5)
 
-df %>% 
-  dplyr::mutate(partition = if_else(train == 1, "train", if_else(nuis == 1, "nuis", "test")),
-                y0 = rbinom(n = n, size = 1, prob = mu),
-                y0cat = if_else(y0 == 1, "one", "zero")) -> df
+df %>%
+  dplyr::mutate(
+    partition = if_else(train == 1, "train", if_else(nuis == 1, "nuis", "test")),
+    y0 = rbinom(n = n, size = 1, prob = mu),
+    y0cat = if_else(y0 == 1, "one", "zero")
+  ) -> df
 
 df %>%
   dplyr::filter(prop < prop_cutoff) -> df
 
 # Stage 1: Estimate nuisance functions
 # bw_mu <- np::npregbw(xdat = select(filter(df, partition == "nuis",
-#                                           A == 0), v1, z1), 
+#                                           A == 0), v1, z1),
 #                      ydat = pull(filter(df, partition == "nuis",
 #                                           A == 0), y0))
 
-bw_mu <- np::npregbw(formula = y0 ~ v1 + z1,
-                     data = filter(df, partition == "nuis",
-                                          A == 0))
+bw_mu <- np::npregbw(
+  formula = y0 ~ v1 + z1,
+  data = filter(
+    df, partition == "nuis",
+    A == 0
+  )
+)
 
-reg_mu <- np::npreg(bws = bw_mu,
-                    data = select(filter(df, partition == "nuis", 
-                                         A == 0), 
-                                         y0, v1, z1),
-                    newdata = select(df, 
-                                         y0, v1, z1),
-                    y.eval = TRUE)
+reg_mu <- np::npreg(
+  bws = bw_mu,
+  data = select(
+    filter(
+      df, partition == "nuis",
+      A == 0
+    ),
+    y0, v1, z1
+  ),
+  newdata = select(
+    df,
+    y0, v1, z1
+  ),
+  y.eval = TRUE
+)
 
-# bw_pi <- np::npregbw(xdat = select(filter(df, partition == "nuis"), v1, z1), 
+# bw_pi <- np::npregbw(xdat = select(filter(df, partition == "nuis"), v1, z1),
 #                      ydat = pull(filter(df, partition == "nuis"), A))
 
-bw_pi <- np::npregbw(formula = A ~ v1 + z1, 
-                     data = select(filter(df, partition == "nuis"), v1, z1, A))
-reg_pi <- np::npreg(bws = bw_pi,
-                    data = select(filter(df, partition == "nuis"),
-                                         A, v1, z1),
-                    newdata = select(filter(df, partition != "nuis"),
-                                         A, v1, z1),
-                    y.eval = TRUE)
+bw_pi <- np::npregbw(
+  formula = A ~ v1 + z1,
+  data = select(filter(df, partition == "nuis"), v1, z1, A)
+)
+reg_pi <- np::npreg(
+  bws = bw_pi,
+  data = select(
+    filter(df, partition == "nuis"),
+    A, v1, z1
+  ),
+  newdata = select(
+    filter(df, partition != "nuis"),
+    A, v1, z1
+  ),
+  y.eval = TRUE
+)
 
-df %>% 
-  dplyr::mutate(muest = predict(reg_mu, newdata = select(df, v1, z1)),
-                propest = predict(reg_pi, newdata = df),
-                bcest = muest + (1-A)/(1-propest)*(y0-muest)) -> df
+df %>%
+  dplyr::mutate(
+    muest = predict(reg_mu, newdata = select(df, v1, z1)),
+    propest = predict(reg_pi, newdata = df),
+    bcest = muest + (1 - A) / (1 - propest) * (y0 - muest)
+  ) -> df
 
 # Stage 2: regress on V
 # regress plugin
-bw_pl <- np::npregbw(formula = muest ~ v1, data = select(filter(df, partition == "train"), 
-                                         muest, v1))
+bw_pl <- np::npregbw(formula = muest ~ v1, data = select(
+  filter(df, partition == "second_stage"),
+  muest, v1
+))
 
-reg_pl <- np::npreg(bws = bw_pl,
-                    data = select(filter(df, partition == "train"), 
-                                         muest, v1), 
-                    newdata = select(filter(df, partition == "test"), 
-                                         muest, v1),
-                    y.eval = TRUE)
+reg_pl <- np::npreg(
+  bws = bw_pl,
+  data = select(
+    filter(df, partition == "second_stage"),
+    muest, v1
+  ),
+  newdata = select(
+    filter(df, partition == "test"),
+    muest, v1
+  ),
+  y.eval = TRUE
+)
 
 # regress bias-corrected
-bw_bc <- np::npregbw(formula = bcest ~ v1, data = select(filter(df, 
-                                                                partition == "train"), 
-                                         bcest, v1))
+bw_bc <- np::npregbw(formula = bcest ~ v1, data = select(
+  filter(
+    df,
+    partition == "train"
+  ),
+  bcest, v1
+))
 
-reg_bc <- np::npreg(bws = bw_bc,
-                    data = select(filter(df, partition == "train"), 
-                                         bcest, v1), 
-                    newdata = select(filter(df, partition == "test"), 
-                                         bcest, v1),
-                    y.eval = TRUE)
+reg_bc <- np::npreg(
+  bws = bw_bc,
+  data = select(
+    filter(df, partition == "train"),
+    bcest, v1
+  ),
+  newdata = select(
+    filter(df, partition == "test"),
+    bcest, v1
+  ),
+  y.eval = TRUE
+)
 
 # regress confounded
-bw_conf <- np::npregbw(formula = y0 ~ v1, data = select(filter(df, 
-                                                               partition == "train", 
-                                                               A == 0), 
-                                         y0, v1))
+bw_conf <- np::npregbw(formula = y0 ~ v1, data = select(
+  filter(
+    df,
+    partition == "train",
+    A == 0
+  ),
+  y0, v1
+))
 
-reg_conf <- np::npreg(bws = bw_conf,
-                    data = select(filter(df, 
-                                         partition == "train", 
-                                         A == 0), 
-                                  y0, v1), 
-                    newdata = select(filter(df, 
-                                            partition == "test", 
-                                            A == 0), 
-                                         y0, v1),
-                    y.eval = TRUE)
+reg_conf <- np::npreg(
+  bws = bw_conf,
+  data = select(
+    filter(
+      df,
+      partition == "train",
+      A == 0
+    ),
+    y0, v1
+  ),
+  newdata = select(
+    filter(
+      df,
+      partition == "test",
+      A == 0
+    ),
+    y0, v1
+  ),
+  y.eval = TRUE
+)
 
-df %>% 
-  dplyr::mutate(pl = predict(reg_pl, newdata = df),
-                bc = predict(reg_bc, newdata = df),
-                conf = predict(reg_conf, newdata = df),
-                const = mean(filter(df, partition == "train", A == 0)$y0)) -> df
+df %>%
+  dplyr::mutate(
+    pl = predict(reg_pl, newdata = df),
+    bc = predict(reg_bc, newdata = df),
+    conf = predict(reg_conf, newdata = df),
+    const = mean(filter(df, partition == "train", A == 0)$y0)
+  ) -> df
 
 df %>%
   dplyr::filter(partition == "test") -> test
 
 
-mse_pl <- compute_mse(preds = test$pl, label = test$nu)
-mse_bc <- compute_mse(preds = test$bc, label = test$nu)
-mse_conf <- compute_mse(preds = test$conf, label = test$nu)
-mse_const <- compute_mse(preds = test$const, label = test$nu)
-mse <- tibble("method" = c("constant", "confounded", "plug-in", "bias-corrected"),
-              "mse" = c(mse_const$mse, mse_conf$mse, mse_pl$mse, mse_bc$mse),
-              "low" = c(mse_const$low, mse_conf$low, mse_pl$low, mse_bc$low), 
-              "high" = c(mse_const$high, mse_conf$high, mse_pl$high, mse_bc$high),
-              "eps_n_exp" = "est", 
-              "eps_sd" = "est", 
-              "c" = c,
-              "a" = toString(a),
-              "prop_cutoff" = prop_cutoff
-              )
-
-# save the mse tables to files
-saveRDS(mse, glue::glue("results/prop{prop_cutoff*100}/est/mse{num}.Rds"))
-
 ```
 
+
+The below code chunk runs simulations and saves the predictions in {r results_folder}
 ```{r}
-mse
+results_folder <- "results/mu_sigmoid/train100/sim{sim}.Rds"
 ```
 
-```{r}
-compute_mse(test$muest, test$y0)$mse
-compute_mse(test$propest, test$A)$mse
-
-compute_mse(test$muest, test$mu)$mse
-compute_mse(test$propest, test$prop)$mse
-```
-
-
-next steps
-
-# set eps to zero and see if you get the same results => check whether plugin does better
-# what if we set n_eps differently for pi, mu
-
-# increase eps_sd to very large, and try further varying n
-
-# redo with estimating the nuisance functions in a stage 1 learning. how does this align?
