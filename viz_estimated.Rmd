@@ -1,0 +1,136 @@
+---
+title: "Visualization Notebook"
+output: html_notebook
+---
+```{r}
+library(tidyverse)
+source("regression_functions.R")
+source("utils.R")
+```
+
+This notebook visualizes the simulation results in 
+```{r}
+results_folder <- "results/estimated/train2000/"
+```
+
+Note the variance calculation to get error bars on MSE still needs to be updated.
+
+```{r}
+prop_cutoff <- 1
+sd_v1 <- 10
+c <- 0.4
+
+# create test data frame with v1 for computing density weights later
+v <- seq(-30, 30, .01)
+#v <- seq(-20, 20, .01)
+test <- tibble(
+  v1 = v
+)
+
+n_test <- nrow(test)
+
+fl <- list.files(results_folder)
+setwd(results_folder)
+res <- dplyr::bind_rows(lapply(fl, readRDS))
+
+res %>%
+  #dplyr::filter(abs(v1) <= 20) %>%
+  dplyr::group_by(method, nu, v1) %>%
+  dplyr::summarise(variance = var(pred),
+                   bias = mean(pred) - mean(nu),
+                   pred = mean(pred)
+                   ) -> res_agg
+
+total_w <- sum(dnorm(test$v1, mean = 0, sd = sd_v1))
+res_agg %>% 
+  dplyr::mutate(sqerr = bias^2 + variance,
+    w = dnorm(v1, mean = 0, sd = sd_v1)/total_w) -> res_agg
+
+res_agg %>% 
+  dplyr::ungroup() %>%
+  dplyr::group_by(method) %>%
+  dplyr::summarise(mse = sum(w*sqerr),
+                vse = n_test * var(w*sqerr)) %>%
+  dplyr::mutate(low = mse - 1.96 *sqrt(vse),
+                high = mse + 1.96 *sqrt(vse)
+                )-> res_sum
+```
+
+
+> visualize predictions and true values for a given simulation
+
+```{r}
+res %>%
+  dplyr::filter(sim_num < 6) %>%
+  tidyr::pivot_wider(names_from = method, values_from = pred) %>%
+  tidyr::pivot_longer(cols = c(nu, pl:bct), names_to = "method", values_to = "pred") %>%
+  ggplot(aes(x = v1, y = pred, color = method)) + geom_point(size = 0.3) + facet_grid(sim_num ~. ) + ylim(c(0, 1.5))
+  
+```
+
+
+> check that weights are 1 
+
+```{r}
+res_agg %>% 
+  dplyr::filter(method == "pl") %>% 
+  dplyr::pull(w) %>% sum()
+```
+
+
+```{r}
+res_sum %>%
+   #dplyr::filter(method != "bc") %>%
+     ggplot(aes(x=method, y= mse, color = method, fill = method)) + geom_point()+ ylab('Mean Squared Error')+ theme_grey(base_size=12)    + theme(legend.position = "bottom") + ggtitle("mse for values of v within 3 sd")
+#ggsave("img/mse_estimated_2sd.pdf")
+```
+
+```{r}
+res_agg %>%
+  #dplyr::filter(abs(v1) <= 20) %>%
+   ggplot(aes(x = v1, y = sqerr, color = method, fill = method)) + geom_point(size = 0.25)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") + ylab("Squared error") 
+
+ggsave("img/sqerr_n2000_30range.pdf")
+```
+
+
+```{r}
+res_agg %>%
+ # dplyr::filter(v1 <= 10) %>%
+   ggplot(aes(x = v1, y = bias^2, color = method, fill = method)) + geom_point(size = 0.25)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+
+#ggsave("img/sq_bias.pdf")
+```
+
+```{r}
+res_agg %>%
+  #dplyr::filter(method != "bc") %>%
+ # dplyr::filter(v1 <= 5) %>%
+   ggplot(aes(x = v1, y = variance, color = method, fill = method)) + geom_point(size = 0.25)   + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+
+#ggsave("img/var.pdf")
+```
+
+> Mean predicitons by true regression value
+
+```{r}
+res_agg %>%
+   ggplot(aes(x = nu, y = pred, color = method, fill = method)) + geom_point()+ geom_abline(slope= 1, intercept = 0)    + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+```
+
+```{r}
+res_agg %>%
+   ggplot(aes(x = nu, y = pred, color = method, fill = method)) + geom_point(size = 0.25)+ geom_abline(slope= 1, intercept = 0)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+```
+
+
+> Performance at the mean covariate v1 = 0
+
+```{r}
+res_agg %>%
+  dplyr::filter(v1 == 0) %>% 
+   ggplot(aes(x=method, y= sqerr, color = method, fill = method)) + geom_point()+ ylab('Mean Squared Error')+ theme_grey(base_size=12)    + theme(legend.position = "bottom") + ggtitle("Performance at the mean for n = 667")
+ggsave("img/mean_2000n_estimated.pdf")
+
+```
+

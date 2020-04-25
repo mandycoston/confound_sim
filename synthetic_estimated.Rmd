@@ -9,201 +9,233 @@ output: html_notebook
 library(tidyverse)
 library(np)
 library(glue)
+library(doParallel)
 source("utils.R")
 source("regression_functions.R")
 ```
 
 
+The below code chunk runs simulations and saves the predictions in {r results_folder}
 ```{r}
-set.seed(99)
-n <- 15000
-num <- 0
-
-c <- .4
-
-a <- c(1, .1, -2.75)
-prop_cutoff <- 1
-sd_v1 <- 10
-v1 <- rnorm(n = n, mean = 0, sd = sd_v1)
-z1 <- rbinom(n = n, size = 1, prob = c * sigmoid(v1) + (1 - c) * .5)
-prop <- sigmoid(as.numeric(as.matrix(cbind(1, v1, z1)) %*% a))
-A <- rbinom(n = n, size = 1, prob = prop)
-
-
-tibble(
-  v1 = v1,
-  z1 = z1,
-  prop = prop,
-  A = A
-) -> df
-
-# regression models
-df %>%
-  dplyr::mutate(
-    mu = purrr::pmap_dbl(list(v1, z1), compute_mu),
-    nu = purrr::pmap_dbl(list(v1, c), compute_nu)
-  ) -> df
-
-train <- rbinom(n = n, size = 1, prob = .33)
-nuis <- rbinom(n = n, size = 1, prob = .5)
-
-df %>%
-  dplyr::mutate(
-    partition = if_else(train == 1, "train", if_else(nuis == 1, "nuis", "test")),
-    y0 = rbinom(n = n, size = 1, prob = mu),
-    y0cat = if_else(y0 == 1, "one", "zero")
-  ) -> df
-
-df %>%
-  dplyr::filter(prop < prop_cutoff) -> df
-
-# Stage 1: Estimate nuisance functions
-# bw_mu <- np::npregbw(xdat = select(filter(df, partition == "nuis",
-#                                           A == 0), v1, z1),
-#                      ydat = pull(filter(df, partition == "nuis",
-#                                           A == 0), y0))
-
-bw_mu <- np::npregbw(
-  formula = y0 ~ v1 + z1,
-  data = filter(
-    df, partition == "nuis",
-    A == 0
-  )
-)
-
-reg_mu <- np::npreg(
-  bws = bw_mu,
-  data = select(
-    filter(
-      df, partition == "nuis",
-      A == 0
-    ),
-    y0, v1, z1
-  ),
-  newdata = select(
-    df,
-    y0, v1, z1
-  ),
-  y.eval = TRUE
-)
-
-# bw_pi <- np::npregbw(xdat = select(filter(df, partition == "nuis"), v1, z1),
-#                      ydat = pull(filter(df, partition == "nuis"), A))
-
-bw_pi <- np::npregbw(
-  formula = A ~ v1 + z1,
-  data = select(filter(df, partition == "nuis"), v1, z1, A)
-)
-reg_pi <- np::npreg(
-  bws = bw_pi,
-  data = select(
-    filter(df, partition == "nuis"),
-    A, v1, z1
-  ),
-  newdata = select(
-    filter(df, partition != "nuis"),
-    A, v1, z1
-  ),
-  y.eval = TRUE
-)
-
-df %>%
-  dplyr::mutate(
-    muest = predict(reg_mu, newdata = select(df, v1, z1)),
-    propest = predict(reg_pi, newdata = df),
-    bcest = muest + (1 - A) / (1 - propest) * (y0 - muest)
-  ) -> df
-
-# Stage 2: regress on V
-# regress plugin
-bw_pl <- np::npregbw(formula = muest ~ v1, data = select(
-  filter(df, partition == "second_stage"),
-  muest, v1
-))
-
-reg_pl <- np::npreg(
-  bws = bw_pl,
-  data = select(
-    filter(df, partition == "second_stage"),
-    muest, v1
-  ),
-  newdata = select(
-    filter(df, partition == "test"),
-    muest, v1
-  ),
-  y.eval = TRUE
-)
-
-# regress bias-corrected
-bw_bc <- np::npregbw(formula = bcest ~ v1, data = select(
-  filter(
-    df,
-    partition == "train"
-  ),
-  bcest, v1
-))
-
-reg_bc <- np::npreg(
-  bws = bw_bc,
-  data = select(
-    filter(df, partition == "train"),
-    bcest, v1
-  ),
-  newdata = select(
-    filter(df, partition == "test"),
-    bcest, v1
-  ),
-  y.eval = TRUE
-)
-
-# regress confounded
-bw_conf <- np::npregbw(formula = y0 ~ v1, data = select(
-  filter(
-    df,
-    partition == "train",
-    A == 0
-  ),
-  y0, v1
-))
-
-reg_conf <- np::npreg(
-  bws = bw_conf,
-  data = select(
-    filter(
-      df,
-      partition == "train",
-      A == 0
-    ),
-    y0, v1
-  ),
-  newdata = select(
-    filter(
-      df,
-      partition == "test",
-      A == 0
-    ),
-    y0, v1
-  ),
-  y.eval = TRUE
-)
-
-df %>%
-  dplyr::mutate(
-    pl = predict(reg_pl, newdata = df),
-    bc = predict(reg_bc, newdata = df),
-    conf = predict(reg_conf, newdata = df),
-    const = mean(filter(df, partition == "train", A == 0)$y0)
-  ) -> df
-
-df %>%
-  dplyr::filter(partition == "test") -> test
-
-
+results_folder <- "results/estimated/train2000/"
 ```
 
 
-The below code chunk runs simulations and saves the predictions in {r results_folder}
 ```{r}
-results_folder <- "results/mu_sigmoid/train100/sim{sim}.Rds"
+start_time <- Sys.time()
+set.seed(990)
+
+# number of simulations
+n_sim <- 500
+
+# number of training points in each simulation
+n <- 2000
+
+# parameter controlling dependence of z1 on v1
+c <- .4
+
+# standard deviation in the predictor v1
+sd_v1 <- 10
+
+# discard all training points with propensity higher
+# than prop_cutoff
+prop_cutoff <- 1
+
+# create a test set to be used for all simulations
+v <- seq(-30, 30, .01)
+#v <- seq(-20, 20, .01)
+
+test <- tibble(
+  v1 = v,
+  nu = compute_nu(v, c)
+)
+
+n_test <- nrow(test)
+
+# parallelize
+registerDoParallel(cores = 15)
+
+# simulate
+foreach(sim = 1:n_sim) %dopar% {
+  # create df = training data
+  tibble(
+    v1 = rnorm(n = n, mean = 0, sd = sd_v1),
+    z1 = rbinom(n = n, size = 1, prob = c * sigmoid(v1) + (1 - c) * .5),
+    prop = sigmoid(as.numeric(as.matrix(cbind(1, v1, z1)) %*% a)),
+    A = rbinom(n = n, size = 1, prob = prop)
+  ) -> df
+
+  # add values of true regression models
+  df %>%
+    dplyr::mutate(
+      mu = purrr::pmap_dbl(list(v1, z1), compute_mu),
+      nu = purrr::pmap_dbl(list(v1, c), compute_nu)
+    ) -> df
+
+  # create three partitions to learn propensity, regression, and second stage
+  second_fl <- rbinom(n = n, size = 1, prob = .33)
+  pi_fl <- rbinom(n = n, size = 1, prob = .5)
+
+  df %>%
+    dplyr::mutate(
+      partition = if_else(second_fl == 1, "second_stage", if_else(pi_fl == 1, "propensity", "regression")),
+      y0 = rbinom(n = n, size = 1, prob = mu),
+      bc_true = mu + (1 - A) / (1 - prop) * (y0 - mu)
+    ) -> df
+
+  df %>%
+    dplyr::filter(prop < prop_cutoff) -> df
+
+  # Stage 1: Estimate nuisance functions
+
+  bw_mu <- np::npregbw(
+    formula = y0 ~ v1 + z1,
+    data = filter(
+      df, partition == "regression",
+      A == 0
+    )
+  )
+
+  reg_mu <- np::npreg(
+    bws = bw_mu,
+    data = select(
+      filter(
+        df, partition == "regression",
+        A == 0
+      ),
+      y0, v1, z1
+    )
+  )
+
+  bw_pi <- np::npregbw(
+    formula = A ~ v1 + z1,
+    data = select(filter(df, partition == "propensity"), v1, z1, A)
+  )
+  reg_pi <- np::npreg(
+    bws = bw_pi,
+    data = select(
+      filter(df, partition == "propensity"),
+      A, v1, z1
+    )
+  )
+
+
+  df %>%
+    dplyr::mutate(
+      muest = predict(reg_mu, newdata = select(df, v1, z1)),
+      propest = pmin(predict(reg_pi, newdata = df), 0.999999),
+      bcest = muest + (1 - A) / (1 - propest) * (y0 - muest)
+    ) -> df
+
+  summary(abs(filter(df, partition != "regression")$mu - filter(df, partition != "regression")$muest)^2)
+  summary(abs(filter(df, partition != "propensity")$prop - filter(df, partition != "propensity")$propest)^2)
+  summary(abs(filter(df, partition != "regression")$y0 - filter(df, partition != "regression")$muest)^2)
+  summary(abs(filter(df, partition != "propensity")$A - filter(df, partition != "propensity")$propest)^2)
+  
+  
+  # Stage 2: regress on V
+  # regress plugin
+  bw_pl <- np::npregbw(formula = muest ~ v1, data = select(
+    filter(df, partition == "second_stage"),
+    muest, v1
+  ))
+
+  reg_pl <- np::npreg(
+    bws = bw_pl,
+    data = select(
+      filter(df, partition == "second_stage"),
+      muest, v1
+    )
+  )
+
+  # regress bias-corrected
+  bw_bc <- np::npregbw(formula = bcest ~ v1, data = select(
+    filter(
+      df,
+      partition == "second_stage"
+    ),
+    bcest, v1
+  ))
+
+  reg_bc <- np::npreg(
+    bws = bw_bc,
+    data = select(
+      filter(df, partition == "second_stage"),
+      bcest, v1
+    )
+  )
+
+
+  # regress bias-corrected with true nuisance functions
+  bw_bct <- np::npregbw(formula = bc_true ~ v1, data = select(
+    filter(
+      df,
+      partition == "second_stage"
+    ),
+    bc_true, v1
+  ))
+
+  reg_bct <- np::npreg(
+    bws = bw_bct,
+    data = select(
+      filter(df, partition == "second_stage"),
+      bc_true, v1
+    )
+  )
+
+  # regress confounded
+  # bw_conf <- np::npregbw(formula = y0 ~ v1, data = select(
+  #   filter(
+  #     df,
+  #     partition == "second_stage",
+  #     A == 0
+  #   ),
+  #   y0, v1
+  # ))
+  #
+  # reg_conf <- np::npreg(
+  #   bws = bw_conf,
+  #   data = select(
+  #     filter(
+  #       df,
+  #       partition == "second_stage",
+  #       A == 0
+  #     ),
+  #     y0, v1
+  #   )
+  # )
+
+
+
+  test %>%
+    dplyr::mutate(
+      pl = predict(reg_pl, newdata = test),
+      bc = predict(reg_bc, newdata = test),
+      bct = predict(reg_bct, newdata = test),
+      # conf = predict(reg_conf, newdata = test),
+      # const = mean(filter(df, partition == "train", A == 0)$y0)
+    ) -> test
+  
+  summary(abs(test$bct - test$bc)^2)
+
+  pred <- tibble(
+    "v1" = dplyr::pull(test, v1),
+    "nu" = dplyr::pull(test, nu),
+    "sim_num" = sim,
+    "pl" = dplyr::pull(test, pl),
+    "bc" = dplyr::pull(test, bc),
+    # "conf" = dplyr::pull(test, conf),
+    "bct" = dplyr::pull(test, bct),
+    "n_train" = n,
+    "vsd" = sd_v1
+  )
+
+  pred %>%
+    tidyr::pivot_longer(cols = pl:bct, names_to = "method", values_to = "pred") -> pred
+
+  saveRDS(pred, glue::glue(results_folder, "sim{sim}.Rds"))
+}
+task_time <- difftime(Sys.time(), start_time)
+print(task_time)
 ```
 

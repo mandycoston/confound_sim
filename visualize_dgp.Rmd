@@ -1,0 +1,161 @@
+---
+title: "Visualize functions"
+output: html_notebook
+---
+
+This is a notebook for visualizing the specified data-generating process. 
+
+```{r}
+library(tidyverse)
+library(np)
+library(glue)
+source("utils.R")
+source("regression_functions.R")
+```
+
+> Visualize your outcome regression functions
+
+```{r}
+c <- 0.4
+# create a test set to be used for all simulations
+v <- seq(-30, 30, .01)
+test1 <- tibble(                 
+  v1 = v,
+  z1 = 1,
+  nu = compute_nu(v, c),
+  mu = compute_mu(v, 1)
+)
+
+
+test0 <- tibble(                 
+  v1 = v,
+  z1 = 0,
+  nu = compute_nu(v, c),
+  mu = compute_mu(v, 0)
+)
+
+test <- rbind(test0, test1)
+
+test %>%
+    dplyr::mutate(
+      prop = sigmoid(as.numeric(as.matrix(cbind(1, v1, z1)) %*% a))
+    ) -> test
+```
+
+```{r}
+test %>%
+  ggplot(aes(x = v1, y = nu)) + geom_point()
+```
+
+```{r}
+test %>%
+  dplyr::mutate(z = factor(z1)) %>%
+  ggplot(aes(x = v1, y = prop, color = z)) + geom_point()
+```
+
+
+```{r}
+test %>%
+  dplyr::mutate(z = factor(z1)) %>%
+  ggplot(aes(x = v1, y = mu, color = z)) + geom_point()
+```
+
+
+```{r}
+summary(test$prop)
+```
+
+
+```{r}
+set.seed(990)
+
+# number of simulations
+n_sim <- 100
+
+# number of training points in each simulation
+n <- 500
+
+# parameter controlling dependence of z1 on v1
+c <- .4
+
+# standard deviation in the predictor v1
+sd_v1 <- 10
+
+# discard all training points with propensity higher
+# than prop_cutoff
+prop_cutoff <- 1
+
+  v1 <- rnorm(n = n, mean = 0, sd = sd_v1)
+  z1 <- rbinom(n = n, size = 1, prob = c * sigmoid(v1) + (1 - c) * .5)
+  prop <- sigmoid(as.numeric(as.matrix(cbind(1, v1, z1)) %*% a))
+  A <- rbinom(n = n, size = 1, prob = prop)
+  summary(prop)
+
+  tibble(
+    v1 = v1,
+    z1 = z1,
+    prop = prop,
+    A = A
+  ) -> df
+
+  # add values of true regression models to dataframe
+  df %>%
+    dplyr::mutate(
+      mu = purrr::pmap_dbl(list(v1, z1), compute_mu),
+      nu = purrr::pmap_dbl(list(v1, c), compute_nu)
+    ) -> df
+
+ mean((df$mu - df$nu)^2) # is this too small of a difference?
+
+  df %>%
+    dplyr::mutate(
+      partition = "train", 
+      y0 = rbinom(n = n, size = 1, prob = mu),
+      y0cat = if_else(y0 == 1, "one", "zero")
+    ) -> df
+
+  df %>%
+    dplyr::filter(prop < prop_cutoff) -> df
+
+      df %>%
+        dplyr::mutate(
+          bc_true = mu + (1 - A) / (1 - prop) * (y0 - mu)
+        ) -> df
+      
+      
+      
+# create a test set to be used for all simulations
+v <- seq(-30, 30, .01)
+test <- tibble(
+  v1 = v,
+  nu = compute_nu(v, c)
+)
+
+test$bc_true <-  
+
+n_test <- nrow(test)      
+
+```
+```{r}
+df %>% 
+  tidyr::pivot_longer(cols = c(mu, bc_true), names_to = "method", values_to = "regression") -> df
+```
+
+
+```{r}
+df %>%
+  dplyr::filter(v1 < 0.05 & v1 > -0.05, method == "mu") %>% View()
+```
+
+```{r}
+df %>% 
+  ggplot(aes(x = v1, y = regression, color = z1)) + geom_point(size = 0.5) + facet_grid(method ~.)
+```
+
+```{r}
+df %>% 
+  dplyr::filter(z1 == 1) %>%
+  ggplot(aes(x = v1, y = regression, color = method)) + geom_point(size = 0.5)
+```
+
+
