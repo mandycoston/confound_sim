@@ -13,13 +13,13 @@ source("utils.R")
 ```
 
 ```{r}
-results_folder <- "results/highdim/param1/"
+results_folder <- "results/highdim/param2/"
 start_time <- Sys.time()
 #set.seed(3)
 set.seed(100)
 results <- tibble()
 n <- 4 * 1000
-n_sim <- 140
+n_sim <- 200
 d <- 500
 dim_z <- 10 # dimension of hidden confounder z
 p <- d - dim_z # dimension of v
@@ -29,7 +29,7 @@ beta <- gamma + zeta
 # beta <- min(round(sqrt(gamma*n/log(d))), d)
 # beta <- min(round(sqrt(gamma*n*log(p))/log(d)), d)
 # alpha <- round(min(1/4*n*log(p)/(log(d)^2), 1/4*gamma*n*log(p)/(log(d)^2*(d-p)), d)) #1/4 becuase 4*1000 vs 1000?
-alpha <- 25
+alpha <- 15
 s <- sort(rep(1:4, n / 4))
 
 # parallelize

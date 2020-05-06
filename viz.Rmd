@@ -8,28 +8,38 @@ source("regression_functions.R")
 source("utils.R")
 ```
 
+This notebook visualizes the simulation results in 
 ```{r}
-# n_sim <- 10
+results_folder <- "results/mu_sigmoid/propa3/train500_ext/"
+```
+
+
+Note the variance calculation to get error bars on MSE still needs to be updated.
+```{r}
 prop_cutoff <- 1
 sd_v1 <- 10
 c <- 0.4
 
-# create a test set to be used for all simulations
+# create test data frame with v1 for computing density weights later
 v <- seq(-30, 30, .01)
 test <- tibble(
-  v1 = v,
-  nu = compute_nu(v, c)
+  v1 = v
 )
 
 n_test <- nrow(test)
 
-fl <- list.files("results/prop100/plugin/")
-setwd("results/prop100/plugin/")
-res <- dplyr::bind_rows(lapply(fl, readRDS))
+fl <- list.files(results_folder)
+setwd(results_folder)
+#res <- dplyr::bind_rows(lapply(fl, readRDS))
+
+res1 <- dplyr::bind_rows(lapply(fl[1:250], readRDS)) %>% dplyr::filter(eps_sd_pi != 5)
+res2 <- dplyr::bind_rows(lapply(fl[251:500], readRDS)) %>% dplyr::filter(eps_sd_pi != 5)
+
+res <- rbind(res1, res2)
+rm(res1, res2)
 
 res %>%
-  dplyr::filter(sim_num != 11) %>%
-  dplyr::group_by(eps_n_exp, eps_sd, method, nu, v1) %>%
+  dplyr::group_by(eps_n_exp, eps_sd_mu, eps_sd_pi, method, nu, v1) %>%
   dplyr::summarise(variance = var(pred),
                    bias = mean(pred) - mean(nu),
                    pred = mean(pred)
@@ -42,7 +52,7 @@ res_agg %>%
 
 res_agg %>% 
   dplyr::ungroup() %>%
-  dplyr::group_by(eps_n_exp, eps_sd, method) %>%
+  dplyr::group_by(eps_n_exp, eps_sd_mu, eps_sd_pi, method) %>%
   dplyr::summarise(mse = sum(w*sqerr),
                 vse = n_test * var(w*sqerr)) %>%
   dplyr::mutate(low = mse - 1.96 *sqrt(vse),
@@ -50,89 +60,100 @@ res_agg %>%
                 )-> res_sum
 ```
 
+
+> visualize predictions and true values for a given simulation
+
 ```{r}
-res_agg %>% 
-  dplyr::filter(method == "const", eps_n_exp == 0, eps_sd == 0) %>%
-  ggplot(aes(x = v1, y = sqerr)) + geom_point()
+res %>%
+  dplyr::filter(sim_num < 6, eps_sd_mu == 5, eps_n_exp == 0.25) %>%
+  tidyr::pivot_wider(names_from = method, values_from = pred) %>%
+  tidyr::pivot_longer(cols = c(nu, pl:bct), names_to = "method", values_to = "pred") %>%
+  ggplot(aes(x = v1, y = pred, color = method)) + geom_point(size = 0.3) + facet_grid(sim_num ~. ) + ylim(c(0, 1.5))
+  
 ```
 
 
-```{r}
-res_agg %>% 
-  dplyr::group_by(method, eps_n_exp, eps_sd) %>%
-  summarise(min_sqerr = min(sqerr),
-            max_sqerr = max(sqerr),
-            median_sqerr = median(sqerr),
-            unweight_sqerr = mean(sqerr))
-```
-
+> check that weights are 1 
 
 ```{r}
 res_agg %>% 
-  dplyr::filter(method == "pl", eps_sd == 1, eps_n_exp == .25) %>% 
+  dplyr::filter(method == "pl", eps_sd_mu == 5, eps_n_exp == .1) %>% 
   dplyr::pull(w) %>% sum()
 ```
 
+
+> compute MSE. We see roughly the expected behavior. We could plot more points in between [0.25, 0.5]. Note that we don't see a crossing exactly at 0.25 likely because of constants. 
+
 ```{r}
 res_sum %>%
-  dplyr::filter(method == "pl") %>%
+  #dplyr::filter(method != "bc") %>%
     ggplot(aes(x=eps_n_exp, y= mse, color = method, fill = method))  +
   geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4) + 
   geom_point() + 
   ylab('Mean Squared Error') + 
-  facet_grid(eps_sd ~.)  + 
+  facet_grid(eps_sd_mu ~ eps_sd_pi)  + 
   theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+#ggsave("img/mse.pdf")
+```
 
+> compute MSE for 1) noisy regression and 2) bias-corrected using noisy propensity and noisy regression
+
+```{r}
+res_sum %>%
+  dplyr::filter(method != "bct") %>%
+    ggplot(aes(x=eps_n_exp, y= mse, color = method, fill = method))  +
+  geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4) + 
+  geom_point() + 
+  ylab('Mean Squared Error') + 
+  facet_grid(eps_sd_mu ~ eps_sd_pi)  + 
+  theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+#ggsave("img/mse.pdf")
+```
+
+
+
+```{r}
+res_agg %>%
+  dplyr::filter(eps_n_exp == .25, method != "bc") %>%
+   ggplot(aes(x = v1, y = bias^2, color = method, fill = method)) + geom_point(size = 0.25) + facet_grid(eps_sd_mu ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+
+#ggsave("img/sq_bias.pdf")
+```
+
+```{r}
+res_agg %>%
+  #dplyr::filter(eps_n_exp == .1, method != "bc") %>%
+   ggplot(aes(x = v1, y = variance, color = method, fill = method)) + geom_point(size = 0.25) + facet_grid(eps_sd_mu ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+
+#ggsave("img/var.pdf")
+```
+
+> Mean predicitons by true regression value
+> shows the bias in the plugin
+
+```{r}
+res_agg %>%
+  dplyr::filter(eps_n_exp == .005) %>%
+   ggplot(aes(x = nu, y = pred, color = method, fill = method)) + geom_point()+ geom_abline(slope= 1, intercept = 0)  + facet_grid(eps_sd_mu ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+```
+
+```{r}
+res_agg %>%
+  dplyr::filter(eps_n_exp == .1) %>%
+   ggplot(aes(x = nu, y = pred, color = method, fill = method)) + geom_point(size = 0.25)+ geom_abline(slope= 1, intercept = 0)  + facet_grid(eps_sd_mu~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
 ```
 
 ```{r}
 res_sum %>%
-    ggplot(aes(x=eps_sd, y= mse, color = method, fill = method))  + geom_ribbon(aes(ymin=low, ymax=high), alpha = 0.4)+ geom_point()+ ylab('Mean Squared Error') + facet_grid(eps_n_exp ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
-
+  dplyr::filter(eps_n_exp == 0.1)
 ```
+
+> Performance at the mean covariate v1 = 0
 
 ```{r}
 res_agg %>%
-  dplyr::filter(eps_sd == 10, eps_n_exp == .1) %>%
-   ggplot(aes(x = nu, y = pred, color = method, fill = method)) + geom_point()+ geom_abline(slope= 1, intercept = 0)  + facet_grid(eps_sd ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
-```
-
-```{r}
-res_agg %>%
-   ggplot(aes(x = nu, y = pred, color = method, fill = method)) +
-  geom_point()+
-  geom_abline(slope= 1, intercept = 0)  +
-  facet_grid(eps_sd ~ eps_n_exp)  + 
-  theme_grey(base_size=12)  + theme(legend.position = "bottom") 
-```
-
-```{r}
-res_agg %>%
-  dplyr::filter(eps_sd == .5, method != "conf") %>%
-   ggplot(aes(x = v1, y = bias^2, color = method, fill = method)) + geom_point()+ ylab('Bias Sq') + facet_grid(eps_n_exp ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
-
-```
-
-```{r}
-res_agg %>%
-  dplyr::filter(eps_sd == .1, eps_n_exp == .25) %>%
-   ggplot(aes(x=v1, y= variance, color = method, fill = method)) + geom_point()+ ylab('Variance') + facet_grid(eps_sd ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
-
-```
-
-```{r}
-res_agg %>%
-  dplyr::filter(eps_sd == .1, eps_n_exp == .25) %>%
-   ggplot(aes(x=v1, y= sqerr, color = method, fill = method)) + geom_point()+ ylab('Squared Error') + facet_grid(eps_sd ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
-
-```
-
-> Performance at the mean
-
-```{r}
-res_agg %>%
-  dplyr::filter(v1 == 0, eps_sd < 5) %>% 
-   ggplot(aes(x=eps_n_exp, y= sqerr, color = method, fill = method)) + geom_point()+ ylab('Mean Squared Error') + facet_grid(eps_sd ~.) +ylim(c(0, 0.0075)) + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
+  dplyr::filter(v1 == 0) %>% 
+   ggplot(aes(x=eps_n_exp, y= sqerr, color = method, fill = method)) + geom_point()+ ylab('Mean Squared Error') + facet_grid(eps_sd_mu ~.)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") 
 
 ```
 
