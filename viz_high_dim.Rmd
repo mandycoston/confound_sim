@@ -1,0 +1,32 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+library(tidyverse)
+```
+
+
+This notebook visualizes the simulation results in 
+```{r}
+results_folder <- "results/highdim/param1/"
+```
+
+```{r}
+results <- readRDS(glue::glue(results_folder,"results.Rds"))
+parameters <- readRDS(glue::glue(results_folder, "parameters.Rds"))
+```
+
+```{r}
+results %>%
+  dplyr::group_by(method) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
+  ) %>%
+  ggplot(aes(x = method, y = mmse, color = method)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = low, ymax = high)) 
+  #+facet_grid(dim ~ ., scales = "free_y")
+```
