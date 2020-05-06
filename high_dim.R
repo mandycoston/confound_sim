@@ -1,27 +1,19 @@
----
-title: "High Dimensional Synthetic Experiments"
-output: html_notebook
----
+# This is a script baesd on high_dim.Rmd and runs a simulation based on Edward's setup.
 
-This notebook runs a simulation based on Edward's setup.
-
-```{r}
 library(tidyverse)
 library(glmnet)
 library(doParallel)
 source("utils.R")
-```
 
-```{r}
-results_folder <- "results/highdim/param2/"
+results_folder <- "results/highdim/param3/"
 start_time <- Sys.time()
 #set.seed(3)
 set.seed(100)
 results <- tibble()
 n <- 4 * 1000
-n_sim <- 200
+n_sim <- 500
 d <- 500
-dim_z <- 10 # dimension of hidden confounder z
+dim_z <- 20 # dimension of hidden confounder z
 p <- d - dim_z # dimension of v
 zeta <- dim_z # number of non-zero predictors in z
 gamma <- 25 # number of non-zero predictors in v
@@ -29,7 +21,7 @@ beta <- gamma + zeta
 # beta <- min(round(sqrt(gamma*n/log(d))), d)
 # beta <- min(round(sqrt(gamma*n*log(p))/log(d)), d)
 # alpha <- round(min(1/4*n*log(p)/(log(d)^2), 1/4*gamma*n*log(p)/(log(d)^2*(d-p)), d)) #1/4 becuase 4*1000 vs 1000?
-alpha <- 15
+alpha <- 45
 s <- sort(rep(1:4, n / 4))
 
 # parallelize
@@ -72,45 +64,44 @@ results <- foreach (sim_num = 1:n_sim) %dopar% {
   bct <- predict(bct_lasso, newx = v, s = "lambda.min")
 
   # replicating edward's
-  tau <- as.numeric(x %*% rep(c(1, 0), c(gamma, d - gamma)))
-  mu1 <- mu0 + tau
-  y <- (1 - a) * mu0 + a * mu1 + rnorm(n, sd = sqrt(sum(mu0^2) / (n * 2)))
+tau <- as.numeric(x %*% rep(c(1, 0), c(gamma, d - gamma)))
+mu1 <- mu0 + tau
+y <- (1 - a) * mu0 + a * mu1 + rnorm(n, sd = sqrt(sum(mu0^2) / (n * 2)))
 
-  mu0hat <- muhat
-  # mu1hat <- predict(cv.glmnet(x, y, subset = ((s == 2) & (a == 1))), newx = x, s = "lambda.min")
-  mu1hat <- predict(cv.glmnet(x[((s == 2) & (a == 1)), ], y[((s == 2) & (a == 1))]), newx = x, s = "lambda.min")
-  plugin <- mu1hat - mu0hat
-  pseudo <- ((a - prophat) / (prophat * (1 - prophat))) * (y - a * mu1hat - (1 - a) * mu0hat) + mu1hat - mu0hat
-  # drl_lasso <- cv.glmnet(x, pseudo, subset = (s == 3))
-  drl_lasso <- cv.glmnet(x[s == 3, ], pseudo[s == 3])
-  drl <- predict(drl_lasso, newx = x, s = "lambda.min")
+mu0hat <- muhat
+# mu1hat <- predict(cv.glmnet(x, y, subset = ((s == 2) & (a == 1))), newx = x, s = "lambda.min")
+mu1hat <- predict(cv.glmnet(x[((s == 2) & (a == 1)), ], y[((s == 2) & (a == 1))]), newx = x, s = "lambda.min")
+plugin <- mu1hat - mu0hat
+pseudo <- ((a - prophat) / (prophat * (1 - prophat))) * (y - a * mu1hat - (1 - a) * mu0hat) + mu1hat - mu0hat
+# drl_lasso <- cv.glmnet(x, pseudo, subset = (s == 3))
+drl_lasso <- cv.glmnet(x[s == 3, ], pseudo[s == 3])
+drl <- predict(drl_lasso, newx = x, s = "lambda.min")
 
-  tibble(
-    "mse" = c(
-      mean((conf - nu)[s == 4]^2),
-      mean((pl - nu)[s == 4]^2),
-      mean((bc - nu)[s == 4]^2),
-      mean((bct - nu)[s == 4]^2),
-      mean((conf1se - nu)[s == 4]^2),
-      mean((pl1se - nu)[s == 4]^2)
-    ),
-    "method" = c("conf", "pl", "bc", "bct", "conf1se", "pl1se"),
-    "sim" = sim_num
-  )
+tibble(
+  "mse" = c(
+    mean((conf - nu)[s == 4]^2),
+    mean((pl - nu)[s == 4]^2),
+    mean((bc - nu)[s == 4]^2),
+    mean((bct - nu)[s == 4]^2),
+    mean((conf1se - nu)[s == 4]^2),
+    mean((pl1se - nu)[s == 4]^2)
+  ),
+  "method" = c("conf", "pl", "bc", "bct", "conf1se", "pl1se"),
+  "sim" = sim_num
+)
 }
-  saveRDS(tibble(    
-    "dim" = d,
-    "n_in_each_fold" = n/4,
-    "dim_z" = dim_z,
-    "p" = p,
-    "zeta" = zeta,
-    "gamma" = gamma,
-    "beta" = beta,
-    "alpha" = alpha), glue::glue(results_folder, "parameters.Rds"))
-  
+saveRDS(tibble(    
+  "dim" = d,
+  "n_in_each_fold" = n/4,
+  "dim_z" = dim_z,
+  "p" = p,
+  "zeta" = zeta,
+  "gamma" = gamma,
+  "beta" = beta,
+  "alpha" = alpha), glue::glue(results_folder, "parameters.Rds"))
+
 saveRDS(bind_rows(results), glue::glue(results_folder, "results.Rds"))
 
 task_time <- difftime(Sys.time(), start_time)
 print(task_time)
-```
 

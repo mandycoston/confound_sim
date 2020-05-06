@@ -22,11 +22,23 @@ results %>%
   dplyr::group_by(method) %>%
   dplyr::summarise(
     mmse = mean(mse),
+    count = n(),
+    vmse = var(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
+  ) 
+```
+
+```{r}
+results %>%
+  dplyr::group_by(method) %>%
+  dplyr::filter(!(method %in% c("pl1se", "conf1se"))) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
     low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
     high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
   ) %>%
   ggplot(aes(x = method, y = mmse, color = method)) +
   geom_point() +
   geom_errorbar(aes(ymin = low, ymax = high)) 
-  #+facet_grid(dim ~ ., scales = "free_y")
 ```
