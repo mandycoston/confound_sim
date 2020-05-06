@@ -10,10 +10,17 @@ source("utils.R")
 
 This notebook visualizes the simulation results in 
 ```{r}
+#results_folder <- "results/estimated/train6000_withconf/"
+#results_folder <- "results/estimated/train2100_withconf/"
+#results_folder <- "results/estimated/train1500_withconf/"
+#results_folder <- "results/estimated/train2000_withconf/"
+#results_folder <- "results/estimated/train1500/"
 results_folder <- "results/estimated/train2000/"
+
 ```
 
-Note the variance calculation to get error bars on MSE still needs to be updated.
+Currently we don't see a significance difference in performance between plugin and BC which makes sense since the true form is quite smooth and therefore easy to estimate (minimax for infinitely differentiable is root-n). 
+We would probably have to specify a more difficult function to estimate 
 
 ```{r}
 prop_cutoff <- 1
@@ -32,6 +39,7 @@ n_test <- nrow(test)
 fl <- list.files(results_folder)
 setwd(results_folder)
 res <- dplyr::bind_rows(lapply(fl, readRDS))
+n_sim <- max(res$sim_num)
 
 res %>%
   #dplyr::filter(abs(v1) <= 20) %>%
@@ -54,6 +62,22 @@ res_agg %>%
   dplyr::mutate(low = mse - 1.96 *sqrt(vse),
                 high = mse + 1.96 *sqrt(vse)
                 )-> res_sum
+
+res %>%
+  dplyr::mutate(sqerr = (nu - pred)^2,
+                w = dnorm(v1, mean = 0, sd = sd_v1)/total_w) -> res
+
+# alternate way of computing MSE
+res %>%
+  dplyr::group_by(method, sim_num) %>%
+  dplyr::summarise(mse_sim = sum(w*sqerr)) %>%
+  dplyr::ungroup() %>%
+  dplyr::group_by(method) %>%
+  dplyr::summarise(mse = mean(mse_sim),
+                var_mse = var(mse_sim),
+                low = mse - 1.96 *sqrt(var_mse/n_sim),
+                high = mse + 1.96 *sqrt(var_mse/n_sim))-> res_sim
+
 ```
 
 
@@ -86,11 +110,21 @@ res_sum %>%
 ```
 
 ```{r}
+res_sum
+```
+
+> compare to alternate way of computing MSE. need to look into slight differences 
+
+```{r}
+res_sim
+```
+
+```{r}
 res_agg %>%
   #dplyr::filter(abs(v1) <= 20) %>%
    ggplot(aes(x = v1, y = sqerr, color = method, fill = method)) + geom_point(size = 0.25)  + theme_grey(base_size=12)    + theme(legend.position = "bottom") + ylab("Squared error") 
 
-ggsave("img/sqerr_n2000_30range.pdf")
+#ggsave("img/sqerr_n2000_30range.pdf")
 ```
 
 

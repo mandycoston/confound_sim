@@ -17,7 +17,7 @@ source("regression_functions.R")
 
 The below code chunk runs simulations and saves the predictions in {r results_folder}
 ```{r}
-results_folder <- "results/estimated/train2000/"
+results_folder <- "results/estimated/train2000_take2/"
 ```
 
 
@@ -183,7 +183,7 @@ foreach(sim = 1:n_sim) %dopar% {
     )
   )
 
-  # regress confounded
+  # # regress confounded
   # bw_conf <- np::npregbw(formula = y0 ~ v1, data = select(
   #   filter(
   #     df,
@@ -192,7 +192,7 @@ foreach(sim = 1:n_sim) %dopar% {
   #   ),
   #   y0, v1
   # ))
-  #
+  # 
   # reg_conf <- np::npreg(
   #   bws = bw_conf,
   #   data = select(
@@ -212,7 +212,7 @@ foreach(sim = 1:n_sim) %dopar% {
       pl = predict(reg_pl, newdata = test),
       bc = predict(reg_bc, newdata = test),
       bct = predict(reg_bct, newdata = test),
-      # conf = predict(reg_conf, newdata = test),
+      #conf = predict(reg_conf, newdata = test),
       # const = mean(filter(df, partition == "train", A == 0)$y0)
     ) -> test
   
@@ -224,7 +224,7 @@ foreach(sim = 1:n_sim) %dopar% {
     "sim_num" = sim,
     "pl" = dplyr::pull(test, pl),
     "bc" = dplyr::pull(test, bc),
-    # "conf" = dplyr::pull(test, conf),
+    #"conf" = dplyr::pull(test, conf),
     "bct" = dplyr::pull(test, bct),
     "n_train" = n,
     "vsd" = sd_v1
