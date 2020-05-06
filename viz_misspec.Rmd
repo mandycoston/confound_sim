@@ -1,0 +1,92 @@
+---
+title: "Visualization Notebook for Parametric Misspecification"
+output: html_notebook
+---
+
+This visualizes the output of misspec.Rmd
+```{r}
+library(tidyverse)
+source("regression_functions.R")
+source("utils.R")
+```
+
+```{r}
+# n_sim <- 10
+prop_cutoff <- 1
+sd_v1 <- 10
+c <- 0.4
+
+# create a test set to be used for all simulations
+v <- seq(-30, 30, .01)
+test <- tibble(
+  v1 = v,
+  nu = compute_nu(v, c)
+)
+
+n_test <- nrow(test)
+
+fl <- list.files("results/const/")
+setwd("results/const/")
+res <- dplyr::bind_rows(lapply(fl, readRDS))
+
+res %>%
+  dplyr::group_by(eps_n_exp, eps_sd, method, nu, v1) %>%
+  dplyr::summarise(
+    variance = var(pred),
+    bias = mean(pred) - mean(nu),
+    pred = mean(pred)
+  ) -> res_agg
+
+total_w <- sum(dnorm(test$v1, mean = 0, sd = sd_v1))
+res_agg %>%
+  dplyr::mutate(
+    sqerr = bias^2 + variance,
+    w = dnorm(v1, mean = 0, sd = sd_v1) / total_w
+  ) -> res_agg
+
+res_agg %>%
+  dplyr::ungroup() %>%
+  dplyr::group_by(eps_n_exp, eps_sd, method) %>%
+  dplyr::summarise(
+    mse = sum(w * sqerr),
+    vse = n_test * var(w * sqerr)
+  ) %>%
+  dplyr::mutate(
+    low = mse - 1.96 * sqrt(vse),
+    high = mse + 1.96 * sqrt(vse)
+  ) -> res_sum
+```
+
+
+```{r}
+res_sum
+```
+
+
+
+
+```{r}
+res_sum %>%
+  ggplot(aes(x = eps_n_exp, y = mse, color = method, fill = method)) +
+  geom_ribbon(aes(ymin = low, ymax = high), alpha = 0.4) +
+  geom_point() +
+  ylab("Mean Squared Error") +
+  facet_grid(eps_sd ~ .) +
+  theme_grey(base_size = 12) +
+  theme(legend.position = "bottom")
+```
+
+
+
+> Performance at the mean
+
+```{r}
+res_agg %>%
+  dplyr::filter(v1 == 0, method != "bc") %>%
+  ggplot(aes(x = eps_n_exp, y = sqerr, color = method, fill = method)) +
+  geom_point() +
+  ylab("Mean Squared Error") +
+  facet_grid(eps_sd ~ .) +
+  theme_grey(base_size = 12) +
+  theme(legend.position = "bottom")
+```

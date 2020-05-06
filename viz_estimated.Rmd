@@ -13,9 +13,9 @@ This notebook visualizes the simulation results in
 #results_folder <- "results/estimated/train6000_withconf/"
 #results_folder <- "results/estimated/train2100_withconf/"
 #results_folder <- "results/estimated/train1500_withconf/"
-#results_folder <- "results/estimated/train2000_withconf/"
+results_folder <- "results/estimated/train2000_withconf/"
 #results_folder <- "results/estimated/train1500/"
-results_folder <- "results/estimated/train2000/"
+#results_folder <- "results/estimated/train2000/"
 
 ```
 

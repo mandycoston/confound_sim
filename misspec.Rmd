@@ -1,0 +1,274 @@
+---
+title: "Parametric Misspecification in regression model"
+output: html_notebook
+---
+
+This notebook runs experiments using a misspecified parametric model to learn the regression function E[Y^0 | V].
+
+However the misspecification is discontinuous and too crazy (you can see in visualize_dgp.Rmd) so further work is required here.
+
+```{r}
+library(tidyverse)
+library(np)
+library(glue)
+library(doParallel)
+source("utils.R")
+```
+
+```{r}
+compute_mu <- function(v, z) {
+ return(dplyr::if_else(v < -10, 0.8*z + 0.6*(1-z),
+                        dplyr::if_else(v <= -5, v/10 + 1 + z/3 + (1-z)/12, 
+                                       dplyr::if_else(v < 0, v/10 + z*25/26 + (1-z) * 4/7, 
+                                       dplyr::if_else(v < 5, v*z/5 + v*(1-z)/18,
+                                                      z*0.65 +(1-z)*0.9)))))
+}
+
+# inputs: predictor v
+# returns a number in [0,1]
+compute_nu <- function(v, c) {
+  p1 <- compute_mu(v, 1) * (c * sigmoid(v) + (1 - c) * .5)
+  p0 <- compute_mu(v, 0) * (1 - (c * sigmoid(v) + (1 - c) * .5))
+  return(p1 + p0)
+}
+```
+
+```{r}
+start_time <- Sys.time()
+set.seed(990)
+
+# number of simulations
+n_sim <- 500
+
+# number of training points in each simulation
+n <- 700
+
+# parameter controlling dependence of z1 on v1
+c <- .4
+
+# standard deviation in the predictor v1
+sd_v1 <- 10
+
+# weights in the linear propensity model
+a <- c(-1, .01, 1.75)
+
+# discard training points that will certainly be treated
+prop_cutoff <- 1
+
+# create a test set to be used for all simulations
+v <- seq(-30, 30, .01)
+test <- tibble(
+  v1 = v,
+  nu = compute_nu(v, c)
+)
+
+n_test <- nrow(test)
+
+# parallelize 
+registerDoParallel(cores = 15)
+  
+# simulate
+foreach (sim=1:n_sim) %dopar% {
+  v1 <- rnorm(n = n, mean = 0, sd = sd_v1)
+  z1 <- rbinom(n = n, size = 1, prob = c * sigmoid(v1) + (1 - c) * .5)
+  prop <- sigmoid(as.numeric(as.matrix(cbind(1, v1, z1)) %*% a))
+  A <- rbinom(n = n, size = 1, prob = prop)
+  summary(prop)
+
+  tibble(
+    v1 = v1,
+    z1 = z1,
+    prop = prop,
+    A = A
+  ) -> df
+
+  # add values of true regression models to dataframe
+  df %>%
+    dplyr::mutate(
+      mu = purrr::pmap_dbl(list(v1, z1), compute_mu),
+      nu = purrr::pmap_dbl(list(v1, c), compute_nu)
+    ) -> df
+
+ # mean((df$mu - df$nu)^2) # is this too small of a difference?
+  
+  train_var <- rbinom(n = n, size = 1, prob = .5)
+
+  df %>%
+    dplyr::mutate(
+      partition = ifelse(train_var == 1, "train", "nuisance"), 
+      y0 = rbinom(n = n, size = 1, prob = mu),
+      y0cat = if_else(y0 == 1, "one", "zero")
+    ) -> df
+
+  df %>%
+    dplyr::filter(prop < prop_cutoff) -> df
+
+  # create dataframe to store results from simulations
+  pred <- tibble(
+    "v1" = numeric(),
+    "nu" = numeric(),
+    "sim_num" = numeric(),
+    "pred" = numeric(),
+    "eps_n_exp" = numeric(),
+    "eps_sd" = numeric(),
+    "n_train" = numeric()
+  )
+  
+  # Stage 1
+  # simulate noise for propensity nuisance function
+
+    for (eps_n_exp in c(.5)) {
+     for (eps_sd in c(0, 5)) {
+       
+       # estimate regression function with linear classifier
+      pl_lm <- lm(y0 ~ v1 + z1, data = dplyr::filter(df, partition == "nuisance", A == 0))
+
+
+      # create pseudo outcomes (in lieu of first stage)
+      eps_pi <- rnorm(nrow(df), mean = 0, sd = eps_sd) / (nrow(df)^(eps_n_exp))
+
+      df %>%
+        dplyr::mutate(
+          mueps = predict(pl_lm, newdata = df),
+          propeps = sigmoid(logit(prop) + eps_pi),
+          bceps = mueps + (1 - A) / (1 - propeps) * (y0 - mueps),
+          bc_trueprop = mueps + (1 - A) / (1 - prop) * (y0 - mueps)
+        ) -> df
+
+      # Stage 2: regress on V
+      # regress plugin
+      bw_pl <- np::npregbw(formula = mueps ~ v1, data = select(
+        filter(df, partition == "train"),
+        mueps, v1
+      ))
+      
+      reg_pl <- np::npreg(
+        bws = bw_pl,
+        data = select(
+          filter(df, partition == "train"),
+          mueps, v1
+        ))
+
+      # # regress bias-corrected
+      bw_bc <- np::npregbw(formula = bceps ~ v1, data = select(
+        filter(
+          df,
+          partition == "train"
+        ),
+        bceps, v1
+      ))
+
+      reg_bc <- np::npreg(
+        bws = bw_bc,
+        data = select(
+          filter(df, partition == "train"),
+          bceps, v1
+        )
+      )
+      
+      # regress bias-corrected with true prop
+      bw_bct <- np::npregbw(formula = bc_trueprop ~ v1, data = select(
+        filter(
+          df,
+          partition == "train"
+        ),
+        bc_trueprop, v1
+      ))
+
+      reg_bct <- np::npreg(
+        bws = bw_bct,
+        data = select(
+          filter(df, partition == "train"),
+          bc_trueprop, v1
+        )
+      )
+
+      # regress confounded
+      # bw_conf <- np::npregbw(formula = y0 ~ v1, data = select(
+      #   filter(
+      #     df,
+      #     partition == "train",
+      #     A == 0
+      #   ),
+      #   y0, v1
+      # ))
+      # 
+      # reg_conf <- np::npreg(
+      #   bws = bw_conf,
+      #   data = select(
+      #     filter(
+      #       df,
+      #       partition == "train",
+      #       A == 0
+      #     ),
+      #     y0, v1
+      #   )
+      # )
+      
+      test %>%
+        dplyr::mutate(
+          pl = predict(reg_pl, newdata = test),
+          bc = predict(reg_bc, newdata = test),
+          bct = predict(reg_bct, newdata = test),
+          #conf = predict(reg_conf, newdata = test),
+          #const = mean(filter(df, partition == "train", A == 0)$y0)
+        ) -> test
+
+    pred <- rbind(pred, tibble(
+  "v1" = dplyr::pull(test, v1),
+  "nu" = dplyr::pull(test, nu),
+  "sim_num" = sim,
+  "pl" = dplyr::pull(test, pl),
+  "bc" = dplyr::pull(test, bc),
+  #"conf" = dplyr::pull(test, conf),
+  "bct" = dplyr::pull(test, bct),
+  "eps_n_exp" = eps_n_exp,
+  "eps_sd" = eps_sd,
+  "n_train" = n,
+))
+    }
+  }
+  
+  pred %>%
+   # tidyr::pivot_longer(cols = pl:conf, names_to = "method", values_to = "pred") -> pred
+   tidyr::pivot_longer(cols = pl:bct, names_to = "method", values_to = "pred") -> pred
+  
+  # save the predictions to files
+  saveRDS(pred, glue::glue("results/const/sim{sim}.Rds"))
+}
+task_time <- difftime(Sys.time(), start_time)
+print(task_time)
+```
+
+```{r}
+
+fl <- list.files("results/const/")
+setwd("results/const/")
+res <- dplyr::bind_rows(lapply(fl, readRDS))
+
+res %>%
+  dplyr::group_by(method, nu, v1) %>%
+  dplyr::summarise(variance = var(pred),
+                   bias = mean(pred) - mean(nu),
+                   pred = mean(pred)
+                   ) -> res_agg
+
+total_w <- sum(dnorm(test$v1, mean = 0, sd = sd_v1))
+res_agg %>% 
+  dplyr::mutate(sqerr = bias^2 + variance,
+    w = dnorm(v1, mean = 0, sd = sd_v1)/total_w) -> res_agg
+
+res_agg %>% 
+  dplyr::ungroup() %>%
+  dplyr::group_by(method) %>%
+  dplyr::summarise(mse = sum(w*sqerr),
+                vse = n_test * var(w*sqerr)) %>%
+  dplyr::mutate(low = mse - 1.96 *sqrt(vse),
+                high = mse + 1.96 *sqrt(vse)
+                )-> res_sum
+```
+
+```{r}
+res_sum
+```
+
