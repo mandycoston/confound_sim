@@ -1,0 +1,61 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+library(tidyverse)
+```
+
+
+This notebook visualizes the simulation results  that vary alpha
+
+```{r}
+results <- readRDS(glue::glue("results/highdim/prop_on_z_only/","results.Rds"))
+parameters <- readRDS(glue::glue("results/highdim/prop_on_z_only/", "parameters.Rds"))
+
+results %>% 
+  dplyr::mutate(alpha = parameters$alpha) -> results0
+
+results <- readRDS(glue::glue("results/highdim/expected/","results.Rds"))
+parameters <- readRDS(glue::glue("results/highdim/expected/", "parameters.Rds"))
+
+results %>% 
+  dplyr::mutate(alpha = parameters$alpha) -> results1
+
+results <- bind_rows(results0, results1)
+```
+
+```{r}
+results %>%
+  dplyr::group_by(alpha, method) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    count = n(),
+    vmse = var(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
+  ) 
+```
+
+```{r}
+parameters
+```
+
+Note that for alpha <= 20, the propensity function is solely determined by Z. Since in this case we no longer have a collider structure, it makes sense that the confounded model does better than it does when we do have the collider. The propensity function is also easier to estimate so the BC model does better.
+I am not sure that it makes sense that the plugin does better at 20 than 45 since the propensity scores are not that different??
+
+```{r}
+results %>%
+  dplyr::group_by(alpha, method) %>%
+  dplyr::filter(!(method %in% c("pl1se", "conf1se"))) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
+  ) %>%
+  ggplot(aes(x = alpha, y = mmse, color = method)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = low, ymax = high)) +
+  ylab("Mean Squared Error")
+#ggsave("img/mse.pdf")
+```
