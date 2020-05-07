@@ -9,8 +9,10 @@ library(tidyverse)
 
 This notebook visualizes the simulation results in 
 ```{r}
-results_folder <- "results/highdim/param1/"
+results_folder <- "results/highdim/param2/"
 ```
+
+param3 gives a useful specification starting point.
 
 ```{r}
 results <- readRDS(glue::glue(results_folder,"results.Rds"))
@@ -28,6 +30,9 @@ results %>%
     high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
   ) 
 ```
+```{r}
+parameters
+```
 
 ```{r}
 results %>%
@@ -40,5 +45,7 @@ results %>%
   ) %>%
   ggplot(aes(x = method, y = mmse, color = method)) +
   geom_point() +
-  geom_errorbar(aes(ymin = low, ymax = high)) 
+  geom_errorbar(aes(ymin = low, ymax = high)) +
+  ylab("Mean Squared Error")
+#ggsave("img/mse.pdf")
 ```
