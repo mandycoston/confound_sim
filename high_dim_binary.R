@@ -1,12 +1,3 @@
----
-title: "R Notebook"
-output: html_notebook
----
-
-Uses larger coefficients than high_dim_small_coef.Rmd 
-```{r}
-# This is a script based on high_dim.Rmd and runs a simulation based on Edward's setup.
-
 library(tidyverse)
 library(glmnet)
 library(doParallel)
@@ -14,12 +5,11 @@ source("utils.R")
 
 results_folder <- "results/highdim/binaryk/"
 start_time <- Sys.time()
-# set.seed(3)
 set.seed(100)
-for (k in c(10)) { # try 10 or 20
+for (k in c(3:9)) { # try 10 or 20
   results <- tibble()
   n <- round(4 * 500 * k)
-  n_sim <- 2
+  n_sim <- 50
   d <- round(100 * k^2)
   q <- round(d / 2) # dimension of hidden confounder z
   p <- d - q # dimension of v
@@ -30,12 +20,12 @@ for (k in c(10)) { # try 10 or 20
   alpha_z <- round(alpha / 2)
   alpha_v <- alpha - alpha_z
   s <- sort(rep(1:4, n / 4))
-
+  
   # parallelize
   registerDoParallel(cores = 35)
   #registerDoParallel(cores = 14)
-
-
+  
+  
   results <- foreach(sim_num = 1:n_sim) %dopar% {
     # for(sim_num in c(1:n_sim)) {
     x <- matrix(rnorm(n * d), n, d)
@@ -45,42 +35,42 @@ for (k in c(10)) { # try 10 or 20
     prop <- sigmoid(as.numeric(x %*% rep(c(1, 0, 1, 0), c(alpha_z, q - alpha_z, alpha_v, p - alpha_v))) / sqrt(2 * alpha))
     a <- rbinom(n, 1, prop)
     y0 <- rbinom(n, 1, mu0)
-
+    
     # qplot(mu0[((s == 2) & (a == 0))])
-
+    
     # stage 1
     mu_lasso <- cv.glmnet(x[((s == 2) & (a == 0)), ], y0[((s == 2) & (a == 0))], family = "binomial")
     muhat <- as.numeric(predict(mu_lasso, newx = x, type = "response", s = "lambda.min"))
-
+    
     prop_lasso <- cv.glmnet(x[s == 1, ], a[s == 1], family = "binomial")
     prophat <- as.numeric(predict(prop_lasso, newx = x, type = "response", s = "lambda.min"))
-
+    
     bchat <- (1 - a) * (y0 - muhat) / (1 - prophat) + muhat
     bc_true <- (1 - a) * (y0 - mu0) / (1 - prop) + mu0
     bc_true_prop <- (1 - a) * (y0 - muhat) / (1 - prop) + muhat
     bc_true_mu <- (1 - a) * (y0 - mu0) / (1 - prophat) + mu0
-
+    
     # stage 2
     conf_lasso <- cv.glmnet(v[((s == 3) & (a == 0)), ], y0[((s == 3) & (a == 0))], family = "binomial")
     conf <- predict(conf_lasso, newx = v, s = "lambda.min", type = "response")
     conf1se <- predict(conf_lasso, newx = v, type = "response")
-
+    
     pl_lasso <- cv.glmnet(v[s == 3, ], muhat[s == 3])
     pl <- predict(pl_lasso, newx = v, s = "lambda.min")
     pl1se <- predict(pl_lasso, newx = v)
-
+    
     bc_lasso <- cv.glmnet(v[s == 3, ], bchat[s == 3])
     bc <- predict(bc_lasso, newx = v, s = "lambda.min")
-
+    
     bct_lasso <- cv.glmnet(v[s == 3, ], bc_true[s == 3])
     bct <- predict(bct_lasso, newx = v, s = "lambda.min")
-
+    
     bctp_lasso <- cv.glmnet(v[s == 3, ], bc_true_prop[s == 3])
     bct_prop <- predict(bctp_lasso, newx = v, s = "lambda.min")
-
+    
     bctm_lasso <- cv.glmnet(v[s == 3, ], bc_true_mu[s == 3])
     bct_mu <- predict(bctm_lasso, newx = v, s = "lambda.min")
-
+    
     results <- rbind(results, tibble(
       "mse" = c(
         mean((conf - nu)[s == 4]^2),
@@ -114,9 +104,8 @@ for (k in c(10)) { # try 10 or 20
     "alpha_z" = alpha_z,
     "alpha" = alpha
   ), glue::glue(results_folder, "k{k}", "parameters.Rds"))
-
+  
   saveRDS(bind_rows(results), glue::glue(results_folder, "k{k}", "results.Rds"))
 }
 task_time <- difftime(Sys.time(), start_time)
 print(task_time)
-```

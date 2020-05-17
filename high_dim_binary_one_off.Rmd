@@ -3,32 +3,29 @@ title: "R Notebook"
 output: html_notebook
 ---
 
-Uses larger coefficients than high_dim_small_coef.Rmd 
-```{r}
-# This is a script based on high_dim.Rmd and runs a simulation based on Edward's setup.
+one_off equivalent of high_dim_binary2.Rmd for parameter setting
 
+```{r}
 library(tidyverse)
 library(glmnet)
 library(doParallel)
 source("utils.R")
 
-results_folder <- "results/highdim/binaryk/"
+results_folder <- "results/highdim/binary/"
 start_time <- Sys.time()
-# set.seed(3)
 set.seed(100)
-for (k in c(10)) { # try 10 or 20
   results <- tibble()
-  n <- round(4 * 500 * k)
-  n_sim <- 2
-  d <- round(100 * k^2)
-  q <- round(d / 2) # dimension of hidden confounder z
+  n <- 4*1000
+  n_sim <- 20
+  d <- 500
+  q <- 350 # dimension of hidden confounder z
   p <- d - q # dimension of v
-  beta <- min(round(2 / 5 * n / 4 * log(p) / log(d)^2), p)
-  zeta <- round(3 * beta / 5) # number of non-zero predictors in z
+  zeta <- 35 # number of non-zero predictors in z
+  beta <- 50
   gamma <- beta - zeta # number of non-zero predictors in v
-  alpha <- round(beta / 2) # sparsity in propensity
-  alpha_z <- round(alpha / 2)
-  alpha_v <- alpha - alpha_z
+  alpha <- 40 # sparsity in propensity
+  alpha_z <- 35
+  alpha_v <- 5
   s <- sort(rep(1:4, n / 4))
 
   # parallelize
@@ -115,8 +112,7 @@ for (k in c(10)) { # try 10 or 20
     "alpha" = alpha
   ), glue::glue(results_folder, "k{k}", "parameters.Rds"))
 
-  saveRDS(bind_rows(results), glue::glue(results_folder, "k{k}", "results.Rds"))
-}
+  saveRDS(bind_rows(results), glue::glue(results_folder, "results.Rds"))
 task_time <- difftime(Sys.time(), start_time)
 print(task_time)
 ```
