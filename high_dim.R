@@ -5,7 +5,7 @@ library(glmnet)
 library(doParallel)
 source("utils.R")
 
-results_folder <- "results/highdim/param3/"
+results_folder <- "results/highdim/alpha40_q35/"
 start_time <- Sys.time()
 #set.seed(3)
 set.seed(100)
@@ -13,7 +13,7 @@ results <- tibble()
 n <- 4 * 1000
 n_sim <- 500
 d <- 500
-dim_z <- 20 # dimension of hidden confounder z
+dim_z <- 35 # dimension of hidden confounder z
 p <- d - dim_z # dimension of v
 zeta <- dim_z # number of non-zero predictors in z
 gamma <- 25 # number of non-zero predictors in v
@@ -21,11 +21,13 @@ beta <- gamma + zeta
 # beta <- min(round(sqrt(gamma*n/log(d))), d)
 # beta <- min(round(sqrt(gamma*n*log(p))/log(d)), d)
 # alpha <- round(min(1/4*n*log(p)/(log(d)^2), 1/4*gamma*n*log(p)/(log(d)^2*(d-p)), d)) #1/4 becuase 4*1000 vs 1000?
-alpha <- 45
+alpha <- 40
 s <- sort(rep(1:4, n / 4))
 
 # parallelize
-registerDoParallel(cores = 15)
+registerDoParallel(cores = 35)
+#registerDoParallel(cores = 15)
+
 
 results <- foreach (sim_num = 1:n_sim) %dopar% {
   x <- matrix(rnorm(n * d), n, d)
@@ -36,17 +38,19 @@ results <- foreach (sim_num = 1:n_sim) %dopar% {
   a <- rbinom(n, 1, prop)
   y0 <- mu0 + rnorm(n, sd = sqrt(sum(mu0^2) / (n * 2)))
 
-  # propvhat <- as.numeric(predict(cv.glmnet(v, a, subset = (s = 1), famliy = "binomial"), newx = v, type = "response", s = "lambda.min"))
-
   # stage 1
   prop_lasso <- cv.glmnet(x[s == 1, ], a[s == 1], family = "binomial")
   prophat <- as.numeric(predict(prop_lasso, newx = x, type = "response"))
 
   mu_lasso <- cv.glmnet(x[((s == 2) & (a == 0)), ], y0[((s == 2) & (a == 0))])
   muhat <- as.numeric(predict(mu_lasso, newx = x))
+ 
 
   bchat <- (1 - a) * (y0 - muhat) / (1 - prophat) + muhat
   bc_true <- (1 - a) * (y0 - mu0) / (1 - prop) + mu0
+  bc_true_prop <- (1 - a) * (y0 - muhat) / (1 - prop) + muhat
+  bc_true_mu <- (1 - a) * (y0 - mu0) / (1 - prophat) + mu0
+  bc_rct <- (1 - a) * (y0 - mu0) / (1 - mean(a)) + mu0
 
   # stage 2
   conf_lasso <- cv.glmnet(v[((s == 3) & (a == 0)), ], y0[((s == 3) & (a == 0))])
@@ -62,20 +66,19 @@ results <- foreach (sim_num = 1:n_sim) %dopar% {
 
   bct_lasso <- cv.glmnet(v[s == 3, ], bc_true[s == 3])
   bct <- predict(bct_lasso, newx = v, s = "lambda.min")
-
-  # replicating edward's
-tau <- as.numeric(x %*% rep(c(1, 0), c(gamma, d - gamma)))
-mu1 <- mu0 + tau
-y <- (1 - a) * mu0 + a * mu1 + rnorm(n, sd = sqrt(sum(mu0^2) / (n * 2)))
-
-mu0hat <- muhat
-# mu1hat <- predict(cv.glmnet(x, y, subset = ((s == 2) & (a == 1))), newx = x, s = "lambda.min")
-mu1hat <- predict(cv.glmnet(x[((s == 2) & (a == 1)), ], y[((s == 2) & (a == 1))]), newx = x, s = "lambda.min")
-plugin <- mu1hat - mu0hat
-pseudo <- ((a - prophat) / (prophat * (1 - prophat))) * (y - a * mu1hat - (1 - a) * mu0hat) + mu1hat - mu0hat
-# drl_lasso <- cv.glmnet(x, pseudo, subset = (s == 3))
-drl_lasso <- cv.glmnet(x[s == 3, ], pseudo[s == 3])
-drl <- predict(drl_lasso, newx = x, s = "lambda.min")
+  
+  bctp_lasso <- cv.glmnet(v[s == 3, ], bc_true_prop[s == 3])
+  bct_prop <- predict(bctp_lasso, newx = v, s = "lambda.min")
+  
+  bctm_lasso <- cv.glmnet(v[s == 3, ], bc_true_mu[s == 3])
+  bct_mu <- predict(bctm_lasso, newx = v, s = "lambda.min")
+  
+  bcrt_lasso <- cv.glmnet(v[s == 3, ], bc_rct[s == 3])
+  bcr <- predict(bcrt_lasso, newx = v, s = "lambda.min")
+  
+  plo_lasso <- cv.glmnet(v[s ==3,], mu0[s==3])
+  plo <- predict(plo_lasso, newx = v, s = "lambda.min")
+  plo1se <- predict(plo_lasso, newx = v)
 
 tibble(
   "mse" = c(
@@ -83,11 +86,19 @@ tibble(
     mean((pl - nu)[s == 4]^2),
     mean((bc - nu)[s == 4]^2),
     mean((bct - nu)[s == 4]^2),
+    mean((bct_prop - nu)[s == 4]^2),
+    mean((bct_mu - nu)[s == 4]^2),
+    mean((bcr - nu)[s == 4]^2),
     mean((conf1se - nu)[s == 4]^2),
-    mean((pl1se - nu)[s == 4]^2)
+    mean((pl1se - nu)[s == 4]^2),
+    mean((plo1se - nu)[s == 4]^2),
+    mean((plo - nu)[s == 4]^2),
+    mean((mu0 - nu)[s == 4]^2)
   ),
-  "method" = c("conf", "pl", "bc", "bct", "conf1se", "pl1se"),
-  "sim" = sim_num
+  "method" = c("conf", "pl", "bc", "bct","bc_true_prop","bc_true_mu", "bc_rt", "conf1se", "pl1se",  "oracle_plugin_1se","oracle_plugin", "regression_diff"),
+  "sim" = sim_num,
+  "prop_nnzero" = nnzero(coef(prop_lasso, s=prop_lasso$lambda.1se)),
+  "mu_nnzero" = nnzero(coef(mu_lasso, s=mu_lasso$lambda.1se))
 )
 }
 saveRDS(tibble(    
