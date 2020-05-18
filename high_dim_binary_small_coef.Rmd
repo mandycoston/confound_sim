@@ -3,7 +3,7 @@ title: "R Notebook"
 output: html_notebook
 ---
 
-This has been tabled in favor of high_dim_binary2.Rmd
+This has been tabled in favor of high_dim_binary_expected since the coefficients are so small they often result in null models in first stage
 ```{r}
 # This is a script based on high_dim.Rmd and runs a simulation based on the setup Edward emailed. It includes code to handle null models for the muhat's. This specification often elicits the null model for one or both nuisance functions in the first stage
 
