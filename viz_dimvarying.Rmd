@@ -1,0 +1,131 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Visualizing results as log d/n -> 0
+
+```{r}
+library(tidyverse)
+```
+
+
+This notebook visualizes the simulation results in 
+```{r}
+results_folder <- "results/highdim/binarykvary/" 
+# res1 <- readRDS(glue::glue(results_folder, "k1results.Rds"))  
+# res2 <- readRDS(glue::glue(results_folder, "k2results.Rds")) 
+res3 <- readRDS(glue::glue(results_folder, "k3results.Rds")) 
+res4 <- readRDS(glue::glue(results_folder, "k4results.Rds"))  
+res5 <- readRDS(glue::glue(results_folder, "k5results.Rds")) 
+res6 <- readRDS(glue::glue(results_folder, "k6results.Rds")) 
+res7 <- readRDS(glue::glue(results_folder, "k7results.Rds"))  
+res8 <- readRDS(glue::glue(results_folder, "k8results.Rds")) 
+res9 <- readRDS(glue::glue(results_folder, "k9results.Rds")) 
+#res10 <- readRDS(glue::glue(results_folder, "k10results.Rds")) 
+# param1 <- readRDS(glue::glue(results_folder, "k1parameters.Rds"))
+# param2 <- readRDS(glue::glue(results_folder, "k2parameters.Rds")) 
+param <- readRDS(glue::glue(results_folder, "k3parameters.Rds")) 
+
+results <- dplyr::bind_rows(res3, res4, res5, res6, res7, res8, res9)
+
+```
+
+
+```{r}
+param
+```
+
+```{r}
+# check balancing of terms
+df <- param3
+err1 <- df$gamma * log(df$p)/ df$n_in_each_fold
+err2 <- (df$beta *log(df$dim)/df$n_in_each_fold)*(df$alpha*log(df$dim)/df$n_in_each_fold)
+print(err1)
+print(err2)
+print(df$beta *log(df$dim)/df$n_in_each_fold)
+```
+
+
+```{r}
+results %>%
+  dplyr::group_by(k, method) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    count = n(),
+    vmse = var(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
+  ) 
+```
+
+
+```{r fig.width=15, fig.height=8}
+# results %>%
+#   dplyr::mutate(method = factor(recode(results$method, 
+#                                 bc = "BC",
+#                                 bct = "Oracle BC",
+#                                 bc_true_prop = "Oracle Prop BC",
+#                                 bc_true_mu = "Oracle Mu BC", 
+#                                 conf = "BTR", 
+#                                 pl = "PL",
+#                                 oracle_plugin = "Oracle PL",
+#                                 oracle_plugin_1se = "Oracle PL 1 se"), 
+#                 levels = rev(c(
+#                  # "regression_diff",
+#                   "Oracle PL",
+#                            "Oracle PL 1 se",
+#                   "Oracle BC",
+#                   "Oracle Prop BC",
+#                   "Oracle Mu BC",
+#                            "pl1se", 
+#                            "conf1se",
+#                            "BC",
+#                            "PL", 
+#                            "BTR"))))-> results
+results %>%
+  dplyr::group_by(k, method) %>%
+  dplyr::filter(!(method %in% c("pl1se", "conf1se", "Oracle PL 1 se", "oracle_plugin_1se", "oracle_plugin", "bc_true_prop", "regression_diff", "bc_true_mu", "bct"))) %>%
+   dplyr::summarise(
+    K = mean(k),
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
+  ) %>%
+  ggplot(aes(x = K, y = mmse, color = method)) + 
+  geom_point() +
+  geom_errorbar(aes(ymin = low, ymax = high)) +
+  theme_bw(base_size = 15) +
+  theme(legend.position = "bottom") +
+  ylab("Mean Squared Error")
+#ggsave("img/binary_varyingdim.pdf", width = 15, height = 8)
+```
+```{r}
+k_map <- function(k) {
+  return(log(50*k^2)/(500*k))
+}
+```
+
+
+```{r}
+results %>%
+  dplyr::group_by(k, method) %>%
+  dplyr::filter(method %in% c("bc", "bct")) %>%
+  # include semi-oracles
+  #dplyr::filter(method %in% c("bc", "bct", "bc_true_prop", "bc_true_mu")) %>%
+  
+  #dplyr::filter(!(method %in% c("pl1se", "conf1se", "Oracle PL 1 se", "oracle_plugin_1se", "regression_diff"))) %>%
+  dplyr::summarise(
+    K = mean(k),
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
+  ) %>%
+  ggplot(aes(x = K, y = mmse, color = method)) + 
+  geom_point() +
+  geom_errorbar(aes(ymin = low, ymax = high)) +
+  theme_bw(base_size = 15) +
+  theme(legend.position = "bottom") +
+  ylab("Mean Squared Error")
+```
+

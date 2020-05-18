@@ -9,14 +9,34 @@ library(tidyverse)
 
 This notebook visualizes the simulation results in 
 ```{r}
-results_folder <- "results/highdim/param2/"
-```
+#results_folder <- "results/highdim/misspec/"
+#results_folder <- "results/highdim/expected_with_more_oracles/"
 
-param3 gives a useful specification starting point.
+#results_folder <- "results/highdim/binary5/"  # plugin achieves pl oracle
+#results_folder <- "results/highdim/alpha40_q35/" # RT for comparison
 
-```{r}
+#results_folder <- "results/highdim/binary_small_coef2/" # Edward's setup with less sparsity
+#results_folder <- "results/highdim/binary9/" # Edward's setup with less sparsity
+
+
+#results_folder <- "results/highdim/binary_small_coef/" # Edward's setup: low error across the board including confounded
+#results_folder <- "results/highdim/binaryk/k3" 
+
+#results_folder <- "results/highdim/easyMU_LRsecond2/" # with no hidden confounding plugin struggles in second stage
+#results_folder <- "results/highdim/alpha40_q35/" # RT for comparison
+#results_folder <- "results/highdim/misspec/"
+
+
+#results_folder <- "results/highdim/binary3/" # shows differences
+results_folder <- "results/highdim/binary/" # shows differences
+
 results <- readRDS(glue::glue(results_folder,"results.Rds"))
 parameters <- readRDS(glue::glue(results_folder, "parameters.Rds"))
+
+```
+
+```{r}
+parameters
 ```
 
 ```{r}
@@ -33,11 +53,37 @@ results %>%
 ```{r}
 parameters
 ```
-
 ```{r}
+summary(results)
+```
+
+
+```{r fig.width=15, fig.height=8}
+# results %>%
+#   dplyr::mutate(method = factor(recode(results$method, 
+#                                 bc = "BC",
+#                                 bct = "Oracle BC",
+#                                 bc_true_prop = "Oracle Prop BC",
+#                                 bc_true_mu = "Oracle Mu BC", 
+#                                 conf = "BTR", 
+#                                 pl = "PL",
+#                                 oracle_plugin = "Oracle PL",
+#                                 oracle_plugin_1se = "Oracle PL 1 se"), 
+#                 levels = rev(c(
+#                  # "regression_diff",
+#                   "Oracle PL",
+#                            "Oracle PL 1 se",
+#                   "Oracle BC",
+#                   "Oracle Prop BC",
+#                   "Oracle Mu BC",
+#                            "pl1se", 
+#                            "conf1se",
+#                            "BC",
+#                            "PL", 
+#                            "BTR"))))-> results
 results %>%
   dplyr::group_by(method) %>%
-  dplyr::filter(!(method %in% c("pl1se", "conf1se"))) %>%
+  dplyr::filter(!(method %in% c("pl1se", "conf1se", "Oracle PL 1 se", "oracle_plugin_1se", "regression_diff", "oracle_plugin"))) %>%
   dplyr::summarise(
     mmse = mean(mse),
     low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
@@ -46,6 +92,28 @@ results %>%
   ggplot(aes(x = method, y = mmse, color = method)) +
   geom_point() +
   geom_errorbar(aes(ymin = low, ymax = high)) +
+  theme_bw(base_size = 15) +
+  theme(legend.position = "bottom") +
   ylab("Mean Squared Error")
-#ggsave("img/mse.pdf")
+#ggsave("img/binary_small_coef2.pdf", width = 15, height = 8)
+```
+
+
+todo: violin
+```{r}
+# results %>%
+#   dplyr::group_by(method) %>%
+#   dplyr::filter(!(method %in% c("pl1se", "conf1se", "Oracle PL 1 se", "oracle_plugin_1se", "regression_diff", "oracle_plugin"))) %>%
+#   dplyr::summarise(
+#     mmse = mean(mse),
+#     low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+#     high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
+#   ) %>%
+#   ggplot(aes(x = method, y = mmse, color = method)) +
+#   geom_point() +
+#   geom_errorbar(aes(ymin = low, ymax = high)) +
+#   theme_bw(base_size = 15) +
+#   theme(legend.position = "bottom") +
+#   ylab("Mean Squared Error")
+# #ggsave("img/binary_small_coef2.pdf", width = 15, height = 8)
 ```
