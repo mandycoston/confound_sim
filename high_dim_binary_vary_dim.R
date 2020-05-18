@@ -1,3 +1,5 @@
+# This is the file to run on AWS to vary dim
+
 library(tidyverse)
 library(glmnet)
 library(doParallel)
@@ -6,10 +8,10 @@ source("utils.R")
 results_folder <- "results/highdim/binaryk/"
 start_time <- Sys.time()
 set.seed(100)
-for (k in c(3:9)) { # try 10 or 20
+for (k in c(10, 12, 15)) { # try 10 or 20
   results <- tibble()
   n <- round(4 * 500 * k)
-  n_sim <- 50
+  n_sim <- 75
   d <- round(100 * k^2)
   q <- round(d / 2) # dimension of hidden confounder z
   p <- d - q # dimension of v
