@@ -5,7 +5,7 @@ library(glmnet)
 library(doParallel)
 source("utils.R")
 
-results_folder <- "results/highdim/alpha40_q35/"
+results_folder <- "results/highdim/regression/expected/"
 start_time <- Sys.time()
 #set.seed(3)
 set.seed(100)
@@ -13,28 +13,26 @@ results <- tibble()
 n <- 4 * 1000
 n_sim <- 500
 d <- 500
-dim_z <- 35 # dimension of hidden confounder z
-p <- d - dim_z # dimension of v
-zeta <- dim_z # number of non-zero predictors in z
+q <- 20 # dimension of hidden confounder z
+p <- d - q # dimension of v
+zeta <- q # number of non-zero predictors in z
 gamma <- 25 # number of non-zero predictors in v
 beta <- gamma + zeta
-# beta <- min(round(sqrt(gamma*n/log(d))), d)
-# beta <- min(round(sqrt(gamma*n*log(p))/log(d)), d)
-# alpha <- round(min(1/4*n*log(p)/(log(d)^2), 1/4*gamma*n*log(p)/(log(d)^2*(d-p)), d)) #1/4 becuase 4*1000 vs 1000?
-alpha <- 40
+alpha_z <- 20
+alpha_v <- 25
+alpha <- alpha_z + alpha_v
 s <- sort(rep(1:4, n / 4))
 
 # parallelize
-registerDoParallel(cores = 35)
-#registerDoParallel(cores = 15)
-
+registerDoParallel(cores = 90)
 
 results <- foreach (sim_num = 1:n_sim) %dopar% {
   x <- matrix(rnorm(n * d), n, d)
-  v <- x[, (dim_z + 1):d]
-  mu0 <- as.numeric(x %*% rep(c(1, 0), c(beta, d - beta)))
-  nu <- as.numeric(x %*% rep(c(0, 1, 0), c(dim_z, beta - dim_z, d - beta)))
-  prop <- sigmoid(as.numeric(x %*% rep(c(1, 0), c(alpha, d - alpha))) / sqrt(4 * alpha))
+  v <- x[, (q + 1):d]
+  mu0 <- as.numeric(x %*% rep(c(1, 0, 1, 0), c(zeta, q - zeta, gamma, p - gamma)))
+  nu <- as.numeric(x %*% rep(c(0, 1, 0), c(q, gamma, p - gamma)))
+  prop <- sigmoid(as.numeric(x %*% rep(c(1, 0, 1, 0), c(alpha_z, q - alpha_z, alpha_v, p - alpha_v))) / sqrt(4 * alpha))
+  
   a <- rbinom(n, 1, prop)
   y0 <- mu0 + rnorm(n, sd = sqrt(sum(mu0^2) / (n * 2)))
 
@@ -98,17 +96,26 @@ tibble(
   "method" = c("conf", "pl", "bc", "bct","bc_true_prop","bc_true_mu", "bc_rt", "conf1se", "pl1se",  "oracle_plugin_1se","oracle_plugin", "regression_diff"),
   "sim" = sim_num,
   "prop_nnzero" = nnzero(coef(prop_lasso, s=prop_lasso$lambda.1se)),
-  "mu_nnzero" = nnzero(coef(mu_lasso, s=mu_lasso$lambda.1se))
+  "mu_nnzero" = nnzero(coef(mu_lasso, s=mu_lasso$lambda.1se)),
+  "p" = p,
+  "zeta" = zeta,
+  "gamma" = gamma,
+  "beta" = beta,
+  "alpha_v" = alpha_v,
+  "alpha_z" = alpha_z,
+  "alpha" = alpha
 )
 }
 saveRDS(tibble(    
   "dim" = d,
   "n_in_each_fold" = n/4,
-  "dim_z" = dim_z,
+  "q" = q,
   "p" = p,
   "zeta" = zeta,
   "gamma" = gamma,
   "beta" = beta,
+  "alpha_v" = alpha_v,
+  "alpha_z" = alpha_z,
   "alpha" = alpha), glue::glue(results_folder, "parameters.Rds"))
 
 saveRDS(bind_rows(results), glue::glue(results_folder, "results.Rds"))
