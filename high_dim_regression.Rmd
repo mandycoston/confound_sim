@@ -14,12 +14,6 @@ source("utils.R")
 
 ```{r}
 # This is a script baesd on high_dim.Rmd and runs a simulation based on Edward's setup.
-
-library(tidyverse)
-library(glmnet)
-library(doParallel)
-source("utils.R")
-
 results_folder <- "results/highdim/regression/expected/"
 start_time <- Sys.time()
 #set.seed(3)
