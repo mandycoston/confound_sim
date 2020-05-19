@@ -4,6 +4,7 @@ output: html_notebook
 ---
 ```{r}
 library(tidyverse)
+library(plotly)
 ```
 
 
@@ -11,10 +12,12 @@ This notebook visualizes the simulation results that vary with a variable: var_p
 
 ```{r}
 # to specify
-results_folder <- "results/highdim/binary/varyparams/varyzeta/"
-var_param <- quo(zeta)
-#results_folder <- "results/highdim/binary/varyp/"
-#var_param <- quo(p)
+# results_folder <- "results/highdim/binary/varyparams/varyalphaz/"
+# var_param <- quo(alpha_z)
+# results_folder <- "results/highdim/binary/varyparams/varyzeta/"
+# var_param <- quo(zeta)
+results_folder <- "results/highdim/binary/varyparams/varyp/"
+var_param <- quo(p)
 
 fl = list.files(results_folder, pattern = ".results.")
 setwd(results_folder)
@@ -49,7 +52,7 @@ results %>%
 #                            "BTR"))))-> results
 results %>%
   dplyr::group_by(!! var_param, method) %>%
-  dplyr::filter(!(method %in% c("pl1se", "conf1se", "regression_diff"))) %>%
+  dplyr::filter(!(method %in% c("pl1se", "conf1se", "regression_diff", "bc_true_mu", "bc_true_prop"))) %>%
   dplyr::summarise(
     mmse = mean(mse),
     low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
@@ -59,9 +62,11 @@ results %>%
   geom_point() +
   geom_errorbar(aes(ymin = low, ymax = high), width = 0.5) +
   ylab("Mean Squared Error") + 
-  scale_x_continuous(breaks = c(10, 20, 30), minor_breaks = c(10, 20, 30)) +
+  #scale_x_continuous(breaks = c(10, 20, 30), minor_breaks = c(10, 20, 30)) +
  #xlab("q (dimensionality of confounding variable Z)") +
-  theme_bw(base_size = 15)  
+  theme_bw(base_size = 15)  -> mse_scatter
+
+ggplotly(mse_scatter)
   #theme(legend.position = "bottom")
 #ggsave("img/mse_varyq.pdf")
 ```
