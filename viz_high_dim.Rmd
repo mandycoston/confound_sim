@@ -28,7 +28,12 @@ This notebook visualizes the simulation results in
 
 
 #results_folder <- "results/highdim/binary3/" # shows differences
-results_folder <- "results/highdim/binary/" # shows differences
+#results_folder <- "results/highdim/binary/" 
+#results_folder <- "results/highdim/regression/expected/" 
+results_folder <- "results/highdim/binary/miss_prop_widen/" 
+#results_folder <- "results/highdim/binary/prop_widen" 
+
+
 
 results <- readRDS(glue::glue(results_folder,"results.Rds"))
 parameters <- readRDS(glue::glue(results_folder, "parameters.Rds"))
@@ -59,31 +64,33 @@ summary(results)
 
 
 ```{r fig.width=15, fig.height=8}
-# results %>%
-#   dplyr::mutate(method = factor(recode(results$method, 
-#                                 bc = "BC",
-#                                 bct = "Oracle BC",
-#                                 bc_true_prop = "Oracle Prop BC",
-#                                 bc_true_mu = "Oracle Mu BC", 
-#                                 conf = "BTR", 
-#                                 pl = "PL",
-#                                 oracle_plugin = "Oracle PL",
-#                                 oracle_plugin_1se = "Oracle PL 1 se"), 
-#                 levels = rev(c(
-#                  # "regression_diff",
-#                   "Oracle PL",
-#                            "Oracle PL 1 se",
-#                   "Oracle BC",
-#                   "Oracle Prop BC",
-#                   "Oracle Mu BC",
-#                            "pl1se", 
-#                            "conf1se",
-#                            "BC",
-#                            "PL", 
-#                            "BTR"))))-> results
+results %>%
+  dplyr::mutate(method = factor(recode(results$method,
+                                bc = "DR",
+                                bct = "Oracle DR",
+                                conf = "BTR",
+                                pl = "PL"),
+                levels = rev(c(
+                  "bc_true_prop",
+                  "bc_true_mu",
+                  "bc_rt_true_mu",
+                  "bc_rt_muest",
+                  "conf1se",
+                  "pl1se",
+                  "regression_diff",
+                  "Oracle DR",
+                           "DR",
+                           "PL",
+                           "BTR"))))-> results
 results %>%
   dplyr::group_by(method) %>%
-  dplyr::filter(!(method %in% c("pl1se", "conf1se", "Oracle PL 1 se", "oracle_plugin_1se", "regression_diff", "oracle_plugin"))) %>%
+  dplyr::filter(!(method %in% c("bc_true_prop",
+                  "bc_true_mu",
+                  "bc_rt_true_mu",
+                  "bc_rt_muest",
+                  "conf1se",
+                  "pl1se",
+                  "regression_diff"))) %>%
   dplyr::summarise(
     mmse = mean(mse),
     low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
@@ -95,9 +102,52 @@ results %>%
   theme_bw(base_size = 15) +
   theme(legend.position = "bottom") +
   ylab("Mean Squared Error")
-#ggsave("img/binary_small_coef2.pdf", width = 15, height = 8)
+#ggsave("img/binary_misspec_prop_widen.pdf", width = 15, height = 8)
 ```
 
+# bar plot
+
+```{r fig.width=6, fig.height=6}
+results %>%
+  dplyr::mutate(method = factor(recode(results$method,
+                                bc = "DR",
+                                bct = "Oracle DR",
+                                conf = "BTR",
+                                pl = "PL"),
+                levels = rev(c(
+                  "bc_true_prop",
+                  "bc_true_mu",
+                  "bc_rt_true_mu",
+                  "bc_rt_muest",
+                  "conf1se",
+                  "pl1se",
+                  "regression_diff",
+                  "Oracle DR",
+                           "DR",
+                           "PL",
+                           "BTR"))))-> results
+results %>%
+  dplyr::group_by(method) %>%
+  dplyr::filter(!(method %in% c("bc_true_prop",
+                  "bc_true_mu",
+                  "bc_rt_true_mu",
+                  "bc_rt_muest",
+                  "conf1se",
+                  "pl1se",
+                  "regression_diff"))) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
+  ) %>%
+  ggplot(aes(x = method, y = mmse, color = method, fill = method)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = low, ymax = high), color = "black") +
+  theme_bw(base_size = 15) +
+  theme(legend.position = "none") +
+  ylab("Mean Squared Error")
+#ggsave("img/binary_misspec_prop_widen.pdf", width = 6, height = 6)
+```
 
 todo: violin
 ```{r}
