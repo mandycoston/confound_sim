@@ -17,6 +17,116 @@ results_folder <- "results/highdim/regression/prop_widen/calib/"
 results <- readRDS( glue::glue(results_folder, "results.Rds"))
 ```
 
+# Fixed bin count (quantiles), variable bin width
+```{r}
+num_bin <- 20
+```
+
+
+> errors against mu
+
+```{r} 
+results %>%
+  pivot_longer(cols = bc:conf, names_to = "method", values_to = "prediction") %>%
+  filter(method != "bct") %>%
+  group_by(method) %>%
+  mutate(b = ntile(mu0, num_bin),
+         abs_err = abs(nu - prediction)) %>%
+  group_by(method, b) %>%
+  summarise(mean_err = mean(abs_err),
+            mean_mu = mean(mu0),
+            low = mean(abs_err) -1.96*sqrt(var(abs_err)/n()),
+            high = mean(abs_err) +1.96*sqrt(var(abs_err)/n())) %>%
+  ggplot(mapping = aes(x = mean_mu, y = mean_err, color = method)) +
+  geom_point() + 
+   geom_errorbar(aes(ymin = low, ymax = high)) 
+  #ggsave("img/binary_calibration_multi_sim.pdf")
+```
+
+
+>  errors against nu
+
+```{r} 
+results %>%
+  pivot_longer(cols = bc:conf, names_to = "method", values_to = "prediction") %>%
+  filter(method != "bct") %>%
+  group_by(method) %>%
+  mutate(b = ntile(nu, num_bin),
+         abs_err = abs(nu - prediction)) %>%
+  group_by(method, b) %>%
+  summarise(mean_err = mean(abs_err),
+            mean_nu = mean(nu),
+            low = mean(abs_err) -1.96*sqrt(var(abs_err)/n()),
+            high = mean(abs_err) +1.96*sqrt(var(abs_err)/n())) %>%
+  ggplot(mapping = aes(x = mean_nu, y = mean_err, color = method)) +
+  geom_point() + 
+   geom_errorbar(aes(ymin = low, ymax = high)) 
+  #ggsave("img/binary_calibration_multi_sim.pdf")
+```
+
+# errors against propensities
+```{r} 
+results %>%
+  pivot_longer(cols = bc:conf, names_to = "method", values_to = "prediction") %>%
+  filter(method != "bct") %>%
+  group_by(method) %>%
+  mutate(b = ntile(prop, num_bin),
+         abs_err = abs(nu - prediction)) %>%
+  group_by(method, b) %>%
+  summarise(mean_err = mean(abs_err),
+            mean_pi = mean(prop),
+            low = mean(abs_err) -1.96*sqrt(var(abs_err)/n()),
+            high = mean(abs_err) +1.96*sqrt(var(abs_err)/n())) %>%
+  ggplot(mapping = aes(x = mean_pi, y = mean_err, color = method)) +
+  geom_point() + 
+   geom_errorbar(aes(ymin = low, ymax = high)) 
+  #ggsave("img/binary_calibration_multi_sim.pdf")
+```
+
+# reverse calibration 
+```{r} 
+results %>%
+  pivot_longer(cols = bc:conf, names_to = "method", values_to = "prediction") %>%
+  filter(method != "bct") %>%
+  group_by(method) %>%
+  mutate(b = ntile(nu, num_bin)) %>%
+  group_by(method, b) %>%
+  summarise(mean_pred = mean(prediction),
+            mean_nu = mean(nu),
+            low_pred = mean(prediction) -1.96*sqrt(var(prediction)/n()),
+            high_pred = mean(prediction) +1.96*sqrt(var(prediction)/n())) %>%
+  ggplot(mapping = aes(x = mean_nu, y = mean_pred, color = method)) +
+  geom_point() + 
+   geom_errorbar(aes(ymin = low_pred, ymax = high_pred)) +
+  geom_abline() 
+  #ggsave("img/binary_calibration_multi_sim.pdf")
+```
+
+> calibration
+note the error bars are too small to be legible (can see if you increase bin to 500 and decrease size of point to 0.1)
+
+```{r} 
+results %>%
+ # filter(sim ==5 ) %>%
+  pivot_longer(cols = bc:conf, names_to = "method", values_to = "prediction") %>%
+  filter(method != "bct") %>%
+  group_by(method) %>%
+  mutate(b = ntile(prediction, num_bin)) %>%
+  group_by(method, b) %>%
+  summarise(mean_pred = mean(prediction),
+            mean_nu = mean(nu),
+            low_nu = mean(nu) -1.96*sqrt(var(nu)/n()),
+            high_nu = mean(nu) +1.96*sqrt(var(nu)/n())) %>%
+  ggplot(mapping = aes(x = mean_pred, y = mean_nu, color = method)) +
+  geom_point() + 
+   geom_errorbar(aes(ymin = low_nu, ymax = high_nu)) +
+  geom_abline() 
+  #ggsave("img/binary_calibration_multi_sim.pdf")
+```
+
+
+# Fixed bin width, variable bin count
+
 # errors against mu
 ```{r} 
 results %>%
@@ -93,9 +203,10 @@ results %>%
 # calibration 
 ```{r} 
 results %>%
+  filter(sim ==5 ) %>%
   pivot_longer(cols = bc:conf, names_to = "method", values_to = "prediction") %>%
   filter(method != "bct") %>%
-  mutate(pred_bin = round(prediction)) %>%
+  mutate(pred_bin = round(prediction/2)) %>%
   group_by(method, pred_bin) %>%
   summarise(mean_pred = mean(prediction),
             mean_nu = mean(nu),
