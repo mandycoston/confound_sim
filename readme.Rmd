@@ -1,0 +1,50 @@
+---
+title: "Readme"
+output: html_notebook
+---
+
+The current scripts and notebooks all perform high dimensional experiments.
+
+viz_high_dim.Rmd can take a results_folder path to a folder containing a "results.Rds" file that contains the MSE per simulation. 
+This notebook displays the MSE for each method.
+
+viz_calib.Rmd also takes a results_folder path to a folder containing a "results.Rds" file;
+but this .Rds file must contain the actual predictions as well as the nu values.
+Code for saving such an .Rds is in high_dim_binary_expected.Rmd but has **some issues that are currently being resolved**
+
+
+# Scripts
+
+In the binary/classification setting,
+
+viz_dimyvarying.Rmd plots the results of experiments that vary n = n_o*k and d = d_o *k^2 for k = 1,2,3,... 
+It may be possible to incorporate this into the viz_high_dim_varying_param.Rmd notebook, but this work is paused since the work on taking log d/n -> 0 has been paused.
+
+
+## Regression
+regression_calib.R (respectively .Rmd for debugging) runs experiments with a workable parameter setting and saves the predictions for calibration-style plots
+
+
+# Result Data Files
+
+## Classification results:
+
+### Wider propensities
+
+### (Deprecated) Tight Propensities
+
+
+## Regression results
+
+
+### Wider propensities
+
+### (Deprecated) Tight Propensities
+Folder: results/highdim/regression/prop_tight
+
+Calib contains predictions for calibration plots in viz_calib.Rmd
+expected contains one-off one
+varyparams contain experiments for varying parameters
+
+
+# Images

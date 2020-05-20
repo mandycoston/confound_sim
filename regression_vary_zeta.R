@@ -4,25 +4,23 @@ library(doParallel)
 source("utils.R")
 
 # This is a script baesd on high_dim.Rmd and runs a simulation based on Edward's setup.
-results_folder <- "results/highdim/regression/prop_widen/varyparams/varyp/"
+results_folder <- "results/highdim/regression/prop_widen/varyparams/varyzeta/"
 start_time <- Sys.time()
 #set.seed(3)
 set.seed(100)
 
-#registerDoParallel(cores = 5)
-registerDoParallel(cores = 48)
+registerDoParallel(cores = 5)
+#registerDoParallel(cores = 48)
 
-for (p in seq(50, 400, 50)) {
+for (zeta in seq(0, 45, 5)) {
   results <- tibble()
   n <- 4 * 1000
-  n_sim <- 500
+  n_sim <- 2#500
   d <- 500
+  p <- 400
   q <- d - p
-  # q <- 20 # dimension of hidden confounder z
-  # p <- d - q # dimension of v
-  zeta <- 20 # number of non-zero predictors in z
-  gamma <- 25 # number of non-zero predictors in v
-  beta <- gamma + zeta
+  beta <- 45
+  gamma <- beta - zeta # number of non-zero predictors in v
   alpha_z <- 20
   alpha_v <- 25
   alpha <- alpha_z + alpha_v
@@ -100,9 +98,9 @@ for (p in seq(50, 400, 50)) {
     "beta" = beta,
     "alpha_v" = alpha_v,
     "alpha_z" = alpha_z,
-    "alpha" = alpha), glue::glue(results_folder, "p{p}", "parameters.Rds"))
+    "alpha" = alpha), glue::glue(results_folder, "zeta{zeta}", "parameters.Rds"))
   
-  saveRDS(bind_rows(results), glue::glue(results_folder,  "p{p}","results.Rds"))
+  saveRDS(bind_rows(results), glue::glue(results_folder,  "zeta{zeta}","results.Rds"))
 }
 
 task_time <- difftime(Sys.time(), start_time)
