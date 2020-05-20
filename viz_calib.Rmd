@@ -5,6 +5,105 @@ output: html_notebook
 
 
 ```{r}
-plot(cars)
+library(tidyverse)
 ```
 
+```{r}
+#binary
+#results_folder <- "results/highdim/errordistr/"
+
+# regression
+results_folder <- "results/highdim/regression/prop_widen/calib/"
+results <- readRDS( glue::glue(results_folder, "results.Rds"))
+```
+
+# errors against mu
+```{r} 
+results %>%
+  pivot_longer(cols = bc:conf, names_to = "method", values_to = "prediction") %>%
+  filter(method != "bct") %>%
+  mutate(mu_bin = round(mu0),
+         abs_err = abs(nu - prediction)) %>%
+  group_by(method, mu_bin) %>%
+  summarise(mean_err = mean(abs_err),
+            mean_mu = mean(mu0),
+            low = mean(abs_err) -1.96*sqrt(var(abs_err)/n()),
+            high = mean(abs_err) +1.96*sqrt(var(abs_err)/n())) %>%
+  ggplot(mapping = aes(x = mean_mu, y = mean_err, color = method)) +
+  geom_point() + 
+   geom_errorbar(aes(ymin = low, ymax = high)) 
+  #ggsave("img/binary_calibration_multi_sim.pdf")
+```
+
+# errors against nu
+```{r} 
+results %>%
+  pivot_longer(cols = bc:conf, names_to = "method", values_to = "prediction") %>%
+  filter(method != "bct") %>%
+  mutate(nu_bin = round(nu),
+         abs_err = abs(nu - prediction)) %>%
+  group_by(method, nu_bin) %>%
+  summarise(mean_err = mean(abs_err),
+            mean_nu = mean(nu),
+            low = mean(abs_err) -1.96*sqrt(var(abs_err)/n()),
+            high = mean(abs_err) +1.96*sqrt(var(abs_err)/n())) %>%
+  ggplot(mapping = aes(x = mean_nu, y = mean_err, color = method)) +
+  geom_point() + 
+   geom_errorbar(aes(ymin = low, ymax = high)) 
+  #ggsave("img/binary_calibration_multi_sim.pdf")
+```
+
+# errors against propensities
+```{r} 
+results %>%
+  pivot_longer(cols = bc:conf, names_to = "method", values_to = "prediction") %>%
+  filter(method != "bct") %>%
+  mutate(pi_bin = round(prop*10),
+         abs_err = abs(nu - prediction)) %>%
+  group_by(method, pi_bin) %>%
+  summarise(mean_err = mean(abs_err),
+            mean_pi = mean(prop),
+            low = mean(abs_err) -1.96*sqrt(var(abs_err)/n()),
+            high = mean(abs_err) +1.96*sqrt(var(abs_err)/n())) %>%
+  ggplot(mapping = aes(x = mean_pi, y = mean_err, color = method)) +
+  geom_point() + 
+   geom_errorbar(aes(ymin = low, ymax = high)) 
+  #ggsave("img/binary_calibration_multi_sim.pdf")
+```
+
+# reverse calibration 
+```{r} 
+results %>%
+  pivot_longer(cols = bc:conf, names_to = "method", values_to = "prediction") %>%
+  filter(method != "bct") %>%
+  #mutate(nu_bin = round(nu*10)) %>%
+  mutate(nu_bin = round(nu)) %>%
+  group_by(method, nu_bin) %>%
+  summarise(mean_pred = mean(prediction),
+            mean_nu = mean(nu),
+            low_pred = mean(prediction) -1.96*sqrt(var(prediction)/n()),
+            high_pred = mean(prediction) +1.96*sqrt(var(prediction)/n())) %>%
+  ggplot(mapping = aes(x = mean_nu, y = mean_pred, color = method)) +
+  geom_point() + 
+   geom_errorbar(aes(ymin = low_pred, ymax = high_pred)) +
+  geom_abline() 
+  #ggsave("img/binary_calibration_multi_sim.pdf")
+```
+
+# calibration 
+```{r} 
+results %>%
+  pivot_longer(cols = bc:conf, names_to = "method", values_to = "prediction") %>%
+  filter(method != "bct") %>%
+  mutate(pred_bin = round(prediction)) %>%
+  group_by(method, pred_bin) %>%
+  summarise(mean_pred = mean(prediction),
+            mean_nu = mean(nu),
+            low_nu = mean(nu) -1.96*sqrt(var(nu)/n()),
+            high_nu = mean(nu) +1.96*sqrt(var(nu)/n())) %>%
+  ggplot(mapping = aes(x = mean_pred, y = mean_nu, color = method)) +
+  geom_point() + 
+   geom_errorbar(aes(ymin = low_nu, ymax = high_nu)) +
+  geom_abline() 
+  #ggsave("img/binary_calibration_multi_sim.pdf")
+```
