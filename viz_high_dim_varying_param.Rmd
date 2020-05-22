@@ -4,20 +4,43 @@ output: html_notebook
 ---
 ```{r}
 library(tidyverse)
-library(plotly)
+library(latex2exp)
+#library(plotly)
+source("plot_utils.R")
 ```
 
 
 This notebook visualizes the simulation results that vary with a variable: var_param
 
 ```{r}
-# to specify
+# results on tighter propensities binary
 # results_folder <- "results/highdim/binary/varyparams/varyalphaz/"
 # var_param <- quo(alpha_z)
 # results_folder <- "results/highdim/binary/varyparams/varyzeta/"
 # var_param <- quo(zeta)
-results_folder <- "results/highdim/binary/varyparams/varyp/"
-var_param <- quo(p)
+# results_folder <- "results/highdim/binary/varyparams/varyp/"
+# var_param <- quo(p)
+
+# results on wider propensities binary
+# results_folder <- "results/highdim/binary_prop_widen/varyparams/varyzeta/"
+# var_param <- quo(zeta)
+# results_folder <- "results/highdim/binary_prop_widen/varyparams/varyp/"
+# var_param <- quo(p)
+# results_folder <- "results/highdim/binary_prop_widen/varyparams/varyalphaz/"
+# var_param <- quo(alpha_z)
+
+# regression
+# results_folder <- "results/highdim/regression/prop_tight/varyparams/varyp/"
+# var_param <- quo(p)
+# results_folder <- "results/highdim/regression/prop_widen/varyparams/varyzeta/"
+# var_param <- quo(zeta)
+
+# results_folder <- "results/highdim/regression/prop_widen/varyparams/varyalphaz/"
+# var_param <- quo(alpha_z)
+
+results_folder <- "results/highdim/regression/prop_widen/varyparams/vary_zeta_fix_gamma/"
+var_param <- quo(zeta)
+img_folder <- "img/regression_vary_zeta_fix_gamma_"
 
 fl = list.files(results_folder, pattern = ".results.")
 setwd(results_folder)
@@ -37,22 +60,11 @@ results %>%
 ```
 
 
+# for experimentation
 ```{r}
-# results %>%
-#   dplyr::mutate(method = factor(recode(results$method, 
-#                                 bc = "BC",
-#                                 bct = "Oracle BC",
-#                                 conf = "BTR", 
-#                                 pl = "PL"), 
-#                 levels = rev(c("Oracle BC",
-#                            "pl1se", 
-#                            "conf1se",
-#                            "BC",
-#                            "PL", 
-#                            "BTR"))))-> results
 results %>%
   dplyr::group_by(!! var_param, method) %>%
-  dplyr::filter(!(method %in% c("pl1se", "conf1se", "regression_diff", "bc_true_mu", "bc_true_prop"))) %>%
+  dplyr::filter(!(method %in% c("pl1se", "conf1se", "regression_diff", "bc_true_mu", "bc_true_prop", "bc_rt",  "oracle_plugin", "oracle_plugin_1se"))) %>%
   dplyr::summarise(
     mmse = mean(mse),
     low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
@@ -61,30 +73,145 @@ results %>%
   ggplot(aes(x = !! var_param, y = mmse, color = method)) +
   geom_point() +
   geom_errorbar(aes(ymin = low, ymax = high), width = 0.5) +
-  ylab("Mean Squared Error") + 
-  #scale_x_continuous(breaks = c(10, 20, 30), minor_breaks = c(10, 20, 30)) +
- #xlab("q (dimensionality of confounding variable Z)") +
-  theme_bw(base_size = 15)  -> mse_scatter
+  #ylab(TeX("$E(\\nu(V) - \\hat{\\nu}(V))^2$")) + 
+  ylab("MSE") +
+ xlab(rlang::as_name(var_param)) +
+  theme_bw(base_size = 15) -> mse_scatter
 
-ggplotly(mse_scatter)
+#ggplotly(mse_scatter) # note that plotly won't work with TeX
   #theme(legend.position = "bottom")
-#ggsave("img/mse_varyq.pdf")
 ```
+
+
+
 
 ```{r}
 results %>%
+  dplyr::filter(method %in% c("bc", "bct", "conf", "pl"))%>%
+  dplyr::mutate(method = factor(recode(method,
+                                bc = "DR",
+                                bct = "Oracle DR",
+                                conf = "BTR",
+                                pl = "PL"),
+                levels = rev(c("Oracle DR",
+                           "DR",
+                           "PL",
+                           "BTR"))))-> results
+```
+
+# for alpha_z plot
+```{r}
+# results %>%
+#   dplyr::mutate(method = factor(recode(results$method,
+#                                 bc = "DR",
+#                                 bct = "Oracle DR",
+#                                 conf = "BTR",
+#                                 pl = "PL"),
+#                 levels = rev(c("Oracle DR",
+#                            "pl1se",
+#                            "conf1se", "regression_diff", "bc_true_mu", "bc_true_prop", "bc_rt",
+#                            "DR",
+#                            "PL",
+#                            "BTR"))))-> results
+# results %>%
+#   dplyr::group_by(!! var_param, method) %>%
+#   dplyr::filter(!(method %in% c("pl1se", "conf1se", "regression_diff", "bc_true_mu", "bc_true_prop", "bc_rt"))) %>%
+#   dplyr::summarise(
+#     mmse = mean(mse),
+#     low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+#     high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+#   ) %>%
+#   ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+#   geom_point() +
+#   geom_errorbar(aes(ymin = low, ymax = high), width = 0.5) +
+#   ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+#  scale_x_continuous(breaks = seq(0, 50, 5), minor_breaks = seq(0, 50, 5)) +
+#  xlab(TeX("$\\alpha_z$ (sparsity of propensity model contributed by $Z$)")) +
+#   scale_color_manual(values = cbPalette) +
+#   theme_bw(base_size = 18)
+# #-> mse_scatter
+# 
+# #ggplotly(mse_scatter) # note that plotly won't work with TeX
+#   #theme(legend.position = "bottom")
+# ggsave("img/regression_varyalphaz.pdf", width = 10, height = 8)
+```
+
+# for zeta plot
+
+
+```{r}
+results %>%
+  dplyr::mutate(method = factor(recode(results$method,
+                                bc = "DR",
+                                bct = "Oracle DR",
+                                conf = "BTR",
+                                pl = "PL"),
+                levels = rev(c("Oracle DR",
+                           "pl1se",
+                           "conf1se", "regression_diff", "bc_true_mu", "bc_true_prop", "bc_rt",
+                           "DR",
+                           "PL",
+                           "BTR"))))-> results
+results %>%
   dplyr::group_by(!! var_param, method) %>%
-  dplyr::filter(!(method %in% c("pl1se", "conf1se"))) %>%
+  dplyr::filter(!(method %in% c("pl1se", "conf1se", "regression_diff", "bc_true_mu", "bc_true_prop", "bc_rt"))) %>%
   dplyr::summarise(
     mmse = mean(mse),
     low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
-    high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
   ) %>%
-  ggplot(aes(x = method, y = mmse, color = method, fill = method)) +
-  geom_col() +
-  geom_errorbar(aes(ymin = low, ymax = high)) +
-  ylab("Mean Squared Error") + 
-  facet_grid(rows = vars(!! var_param), scales = "free_y")
-  theme_bw(base_size = 15)
-#ggsave("img/binary_varying_rlang::as_name(var_param).pdf")
+  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 0.5) +
+  ylab(TeX("$E(\\nu(V) - \\hat{\\nu}(V))^2$")) +
+ scale_x_continuous(breaks = seq(0, 50, 5), minor_breaks = seq(0, 50, 5)) +
+xlab(TeX("$\\beta_z$")) +
+  scale_color_manual(values = cbPalette) +
+  theme_bw(base_size = 18)
+
+ggsave(glue::glue(img_folder, "vary_zeta.pdf"), width = 10, height = 8)
 ```
+
+
+# for p plot
+
+```{R}
+# results %>%
+#   dplyr::group_by(!! var_param, method) %>%
+#   dplyr::summarise(
+#     mmse = mean(mse),
+#     low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+#     high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+#   ) %>%
+#   ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+#   geom_point() +
+#   geom_errorbar(aes(ymin = low, ymax = high), width = 0.5) +
+#   ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+#  scale_x_continuous(breaks = seq(50, 400, 50), minor_breaks = seq(50, 400, 50)) +
+#  xlab(TeX("$p$ (dimensionality of $V$)")) +
+#   scale_color_manual(values = cbPalette[1:4])+
+#   theme_bw(base_size = 18)
+
+#ggsave("img/binary_varyp.pdf", width = 10, height = 8)
+```
+
+
+# for general
+
+# ```{r}
+# results %>%
+#   dplyr::group_by(!! var_param, method) %>%
+#   dplyr::filter(!(method %in% c("pl1se", "conf1se"))) %>%
+#   dplyr::summarise(
+#     mmse = mean(mse),
+#     low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+#     high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
+#   ) %>%
+#   ggplot(aes(x = method, y = mmse, color = method, fill = method)) +
+#   geom_col() +
+#   geom_errorbar(aes(ymin = low, ymax = high)) +
+#   ylab("Mean Squared Error") + 
+#   facet_grid(rows = vars(!! var_param), scales = "free_y")
+#   theme_bw(base_size = 15)
+# #ggsave("img/binary_varying_rlang::as_name(var_param).pdf")
+# ```

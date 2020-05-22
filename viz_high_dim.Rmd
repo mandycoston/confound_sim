@@ -4,6 +4,8 @@ output: html_notebook
 ---
 ```{r}
 library(tidyverse)
+library(latex2exp)
+source("plot_utils.R")
 ```
 
 
@@ -33,10 +35,17 @@ This notebook visualizes the simulation results in
 results_folder <- "results/highdim/binary/miss_prop_widen/" 
 #results_folder <- "results/highdim/binary/prop_widen" 
 
+#results_folder <- "results/highdim/regression/prop_widen/misspec/" 
 
+results_folder <- "results/highdim/regression/prop_widen/varyparams/vary_zeta_fix_gamma/" 
 
 results <- readRDS(glue::glue(results_folder,"results.Rds"))
 parameters <- readRDS(glue::glue(results_folder, "parameters.Rds"))
+
+#img_folder <- "img/regression_"
+#img_folder <- "img/binary_"
+img_folder <- "img/test_"
+
 
 ```
 
@@ -99,33 +108,16 @@ results %>%
   ggplot(aes(x = method, y = mmse, color = method)) +
   geom_point() +
   geom_errorbar(aes(ymin = low, ymax = high)) +
-  theme_bw(base_size = 15) +
-  theme(legend.position = "bottom") +
-  ylab("Mean Squared Error")
-#ggsave("img/binary_misspec_prop_widen.pdf", width = 15, height = 8)
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  scale_color_manual(values = cbPalette) +
+  theme_bw(base_size = 20) + 
+theme(legend.position = "bottom") 
+ggsave(glue::glue(img_folder, "misspec_scatter.pdf"), width = 15, height = 8)
 ```
 
 # bar plot
 
 ```{r fig.width=6, fig.height=6}
-results %>%
-  dplyr::mutate(method = factor(recode(results$method,
-                                bc = "DR",
-                                bct = "Oracle DR",
-                                conf = "BTR",
-                                pl = "PL"),
-                levels = rev(c(
-                  "bc_true_prop",
-                  "bc_true_mu",
-                  "bc_rt_true_mu",
-                  "bc_rt_muest",
-                  "conf1se",
-                  "pl1se",
-                  "regression_diff",
-                  "Oracle DR",
-                           "DR",
-                           "PL",
-                           "BTR"))))-> results
 results %>%
   dplyr::group_by(method) %>%
   dplyr::filter(!(method %in% c("bc_true_prop",
@@ -143,10 +135,11 @@ results %>%
   ggplot(aes(x = method, y = mmse, color = method, fill = method)) +
   geom_col() +
   geom_errorbar(aes(ymin = low, ymax = high), color = "black") +
-  theme_bw(base_size = 15) +
+  theme_bw(base_size = 18) +
   theme(legend.position = "none") +
-  ylab("Mean Squared Error")
-#ggsave("img/binary_misspec_prop_widen.pdf", width = 6, height = 6)
+   ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  scale_fill_manual(values = cbPalette) +
+ggsave(glue::glue(img_folder, "misspec_bar.pdf"), width = 9, height = 7)
 ```
 
 todo: violin
