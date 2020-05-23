@@ -3,19 +3,18 @@ library(glmnet)
 library(doParallel)
 source("utils.R")
 
-# This is a script baesd on high_dim.Rmd and runs a simulation based on Edward's setup.
+# This script varies zeta and gamma, holding beta and other parameters fixed.
 results_folder <- "results/highdim/regression/prop_widen/varyparams/varyzeta/"
 start_time <- Sys.time()
 #set.seed(3)
 set.seed(100)
 
-registerDoParallel(cores = 5)
-#registerDoParallel(cores = 48)
+registerDoParallel(cores = 48)
 
 for (zeta in seq(0, 45, 5)) {
   results <- tibble()
   n <- 4 * 1000
-  n_sim <- 2#500
+  n_sim <- 500
   d <- 500
   p <- 400
   q <- d - p
