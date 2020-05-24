@@ -22,7 +22,7 @@ registerDoParallel(cores = 15)
 
   results <- tibble()
   n <- 4 * 1000
-  n_sim <- 15*10#500
+  n_sim <- 15*2#500
   d <- 500
   p <- 300
   q <- d - p
@@ -34,7 +34,7 @@ registerDoParallel(cores = 15)
   alpha <- alpha_z + alpha_v
   s <- sort(rep(1:4, n / 4))
 for (m in c(0.2, 0.4, 0.6, 0.8, 1)) {
-  results_folder <- glue::glue(results_folder_all, "m{m}_")
+  results_folder <- glue::glue(results_folder_all, "m{m*10}_")
   results <- foreach (sim_num = 1:n_sim) %dopar% {
   v <- matrix(rnorm(n * p), n, p)
   means <- as.vector(v[,1:q])
