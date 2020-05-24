@@ -15,13 +15,13 @@ start_time <- Sys.time()
 set.seed(100)
 results <- tibble()
 n <- 4 * 1000
-n_sim <- 5#500
+n_sim <- 14*5#500
 d <- 500
-q <- 350 # dimension of hidden confounder z
+q <- 400 # dimension of hidden confounder z
 p <- d - q # dimension of v
-zeta <- 35 # number of non-zero predictors in z
+gamma <- 4*3 # number of non-zero predictors in v
 beta <- 50
-gamma <- beta - zeta # number of non-zero predictors in v
+zeta <- beta-gamma # number of non-zero predictors in z
 alpha <- 40 # sparsity in propensity
 alpha_z <- 35
 alpha_v <- 5
@@ -40,9 +40,9 @@ results <- foreach(sim_num = 1:n_sim) %dopar% {
   
   mu0 <- sigmoid(as.numeric(z %*% rep(c(1, 0), c(zeta, q - zeta)) +
     v_second_order %*% c(rep(c(1, -1), gamma/4), rep(0,p/2 - gamma/2))+
-       v_first_order %*% rep(c(1, 0), c(gamma/2, p/2 - gamma/2)))/sqrt(beta*0.01))
+       v_first_order %*% rep(c(1, 0), c(gamma/2, p/2 - gamma/2)))/sqrt(beta*0.02))
   nu <- sigmoid(as.numeric(v_second_order %*% c(rep(c(1, -1), gamma/4), rep(0,p/2 - gamma/2))+
-       v_first_order %*% rep(c(1, 0), c(gamma/2, p/2 - gamma/2)))/sqrt(beta*0.01))
+       v_first_order %*% rep(c(1, 0), c(gamma/2, p/2 - gamma/2)))/sqrt(beta*0.02))
     prop <- sigmoid(as.numeric(x %*% rep(c(1, 0, 1, 0), c(alpha_z, q - alpha_z, alpha_v, p - alpha_v))) / sqrt(alpha))
   a <- rbinom(n, 1, prop)
   y0 <- rbinom(n, 1, mu0)
@@ -64,51 +64,34 @@ results <- foreach(sim_num = 1:n_sim) %dopar% {
   bc_rct_muest <- (1 - a) * (y0 - muhat) / (1 - mean(a)) + muhat
 
   # stage 2
-  conf_lasso <- cv.glmnet(v[((s == 3) & (a == 0)), ], y0[((s == 3) & (a == 0))], family = "binomial")
-  conf <- predict(conf_lasso, newx = v, s = "lambda.min", type = "response")
-  conf1se <- predict(conf_lasso, newx = v, type = "response")
+  conf_lasso <- cv.glmnet(v_first_order[((s == 3) & (a == 0)), ], y0[((s == 3) & (a == 0))], family = "binomial")
+  conf <- predict(conf_lasso, newx = v_first_order, s = "lambda.min", type = "response")
+  conf1se <- predict(conf_lasso, newx = v_first_order, type = "response")
 
-  pl_lasso <- cv.glmnet(v[s == 3, ], muhat[s == 3])
-  pl <- predict(pl_lasso, newx = v, s = "lambda.min")
-  pl1se <- predict(pl_lasso, newx = v)
+  pl_lasso <- cv.glmnet(v_first_order[s == 3, ], muhat[s == 3])
+  pl <- predict(pl_lasso, newx = v_first_order, s = "lambda.min")
+  pl1se <- predict(pl_lasso, newx = v_first_order)
 
-  bc_lasso <- cv.glmnet(v[s == 3, ], bchat[s == 3])
-  bc <- predict(bc_lasso, newx = v, s = "lambda.min")
+  bc_lasso <- cv.glmnet(v_first_order[s == 3, ], bchat[s == 3])
+  bc <- predict(bc_lasso, newx = v_first_order, s = "lambda.min")
 
-  bct_lasso <- cv.glmnet(v[s == 3, ], bc_true[s == 3])
-  bct <- predict(bct_lasso, newx = v, s = "lambda.min")
-
-  bctp_lasso <- cv.glmnet(v[s == 3, ], bc_true_prop[s == 3])
-  bct_prop <- predict(bctp_lasso, newx = v, s = "lambda.min")
-
-  bctm_lasso <- cv.glmnet(v[s == 3, ], bc_true_mu[s == 3])
-  bct_mu <- predict(bctm_lasso, newx = v, s = "lambda.min")
-
-  bcrt_lasso <- cv.glmnet(v[s == 3, ], bc_rct[s == 3])
-  bcr <- predict(bcrt_lasso, newx = v, s = "lambda.min")
-  
-  bcrt_muest_lasso <- cv.glmnet(v[s == 3, ], bc_rct_muest[s == 3])
-  bcr_muest <- predict(bcrt_muest_lasso, newx = v, s = "lambda.min")
-
- tibble(
+  bct_lasso <- cv.glmnet(v_first_order[s == 3, ], bc_true[s == 3])
+  bct <- predict(bct_lasso, newx = v_first_order, s = "lambda.min")
+ 
+  mse_results <- tibble(
     "mse" = c(
       mean((conf - nu)[s == 4]^2),
       mean((pl - nu)[s == 4]^2),
       mean((bc - nu)[s == 4]^2),
-      mean((bct - nu)[s == 4]^2),
-      mean((bct_prop - nu)[s == 4]^2),
-      mean((bct_mu - nu)[s == 4]^2),
-      mean((bcr - nu)[s == 4]^2),
-      mean((bcr_muest - nu)[s == 4]^2),
-      mean((conf1se - nu)[s == 4]^2),
-      mean((pl1se - nu)[s == 4]^2),
-      mean((mu0 - nu)[s == 4]^2)
+      mean((bct - nu)[s == 4]^2)
     ),
-    "method" = c("conf", "pl", "bc", "bct", "bc_true_prop", "bc_true_mu", "bc_rt_true_mu", "bc_rt_muest", "conf1se", "pl1se", "regression_diff"),
+    "method" = c("conf", "pl", "bc", "bct"),
     "sim" = sim_num,
     "prop_nnzero" = nnzero(coef(prop_lasso, s = prop_lasso$lambda.1se)),
     "mu_nnzero" = nnzero(coef(mu_lasso, s = mu_lasso$lambda.1se))
   )
+ 
+ 
 }
 saveRDS(tibble(
   "dim" = d,

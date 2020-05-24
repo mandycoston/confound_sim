@@ -4,7 +4,7 @@ library(glmnet)
 library(doParallel)
 source("utils.R")
 
-results_folder <- "results/highdim/binary/varyparams/varyzeta/"
+results_folder <- "results/highdim/binary_prop_widen/varyparams/varyzeta/"
 start_time <- Sys.time()
 set.seed(100)
 for (zeta in seq(0, 50, 5)) {
@@ -23,7 +23,7 @@ for (zeta in seq(0, 50, 5)) {
   s <- sort(rep(1:4, n / 4))
   
   # parallelize
-  registerDoParallel(cores = 90)
+  registerDoParallel(cores = 48)
   #registerDoParallel(cores = 13)
   
   results <- foreach(sim_num = 1:n_sim) %dopar% {
@@ -31,7 +31,7 @@ for (zeta in seq(0, 50, 5)) {
     v <- x[, (q + 1):d]
     mu0 <- sigmoid(as.numeric(x %*% rep(c(1, 0, 1, 0), c(zeta, q - zeta, gamma, p - gamma))) / sqrt(beta * 0.01))
     nu <- sigmoid(as.numeric(x %*% rep(c(0, 1, 0), c(q, gamma, p - gamma))) / sqrt(beta * 0.01))
-    prop <- sigmoid(as.numeric(x %*% rep(c(1, 0, 1, 0), c(alpha_z, q - alpha_z, alpha_v, p - alpha_v))) / sqrt(4 * alpha))
+    prop <- sigmoid(as.numeric(x %*% rep(c(1, 0, 1, 0), c(alpha_z, q - alpha_z, alpha_v, p - alpha_v))) / sqrt(alpha))
     a <- rbinom(n, 1, prop)
     y0 <- rbinom(n, 1, mu0)
     
@@ -72,7 +72,7 @@ for (zeta in seq(0, 50, 5)) {
     bcrt_lasso <- cv.glmnet(v[s == 3, ], bc_rct[s == 3])
     bcr <- predict(bcrt_lasso, newx = v, s = "lambda.min")
     
-    results <- rbind(results, tibble(
+    tibble(
       "mse" = c(
         mean((conf - nu)[s == 4]^2),
         mean((pl - nu)[s == 4]^2),
@@ -96,7 +96,7 @@ for (zeta in seq(0, 50, 5)) {
       "alpha_v" = alpha_v,
       "alpha_z" = alpha_z,
       "alpha" = alpha
-    ))
+    )
   }
   saveRDS(tibble(
     "dim" = d,
