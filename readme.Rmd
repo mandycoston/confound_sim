@@ -5,24 +5,43 @@ output: html_notebook
 
 The current scripts and notebooks all perform high dimensional experiments.
 
-viz_high_dim.Rmd can take a results_folder path to a folder containing a "results.Rds" file that contains the MSE per simulation. 
-This notebook displays the MSE for each method.
-
-viz_calib.Rmd also takes a results_folder path to a folder containing a "results.Rds" file;
-but this .Rds file must contain the actual predictions as well as the nu values.
-Code for saving such an .Rds is in high_dim_binary_expected.Rmd but has **some issues that are currently being resolved**
 
 
-# Scripts
+# Data-generating Scripts
 
-In the binary/classification setting,
+## Classification
+*high_dim_binary_expected.Rmd* has code for one-off specifications in the binary setting. 
+Current parameter setting shows the expected behavior.
 
-viz_dimyvarying.Rmd plots the results of experiments that vary n = n_o*k and d = d_o *k^2 for k = 1,2,3,... 
-It may be possible to incorporate this into the viz_high_dim_varying_param.Rmd notebook, but this work is paused since the work on taking log d/n -> 0 has been paused.
+### Calibration / error distributions
+*binary_calib.R* runs a one-off specification and saves the predictions and true nu's. 
+
+### Varying parameters
+**binary_vary_p.R**
+**binary_vary_zeta.R**
+**binary_vary_alpha_z.R**
+
+### Misspecification
+**binary_misspec.R**
 
 
 ## Regression
+high_dim_regression.Rmd/.R has code for one-off parameter specifications
+
+### Calibration / error distributions
 regression_calib.R (respectively .Rmd for debugging) runs experiments with a workable parameter setting and saves the predictions for calibration-style plots
+
+### Varying parameters
+regression_vary_p.R: varies p and q, fixing d, gamma and zeta
+regression_vary_p_q_gamma_zeta.R: varies p = 16*gamma and q = d- p and zeta = round(q/16)
+regression_vary_alpha_z.R
+regression_vary_zeta.R : varies zeta and gamma, fixing beta
+regression_vary_zeta_fix_gamma.R : varies zeta and beta, fixing gamma
+
+### Misspecification
+regression_misspec.R (high_dim_misspec.Rmd for debugging) uses second-order V terms in the first stage only so that the second-stage is misspecified.
+
+
 
 
 # Result Data Files
@@ -34,9 +53,8 @@ regression_calib.R (respectively .Rmd for debugging) runs experiments with a wor
 ### (Deprecated) Tight Propensities
 
 
+
 ## Regression results
-
-
 ### Wider propensities
 
 ### (Deprecated) Tight Propensities
@@ -45,6 +63,24 @@ Folder: results/highdim/regression/prop_tight
 Calib contains predictions for calibration plots in viz_calib.Rmd
 expected contains one-off one
 varyparams contain experiments for varying parameters
+
+
+# Visualization Scripts
+
+viz_high_dim.Rmd can take a results_folder path to a folder containing a "results.Rds" file that contains the MSE per simulation. 
+This notebook displays the MSE for each method.
+
+viz_calib.Rmd also takes a results_folder path to a folder containing a "results.Rds" file;
+but this .Rds file must contain the actual predictions as well as the nu values.
+Code for saving such an .Rds is in high_dim_binary_expected.Rmd 
+
+*viz_high_dim_varying_param.Rmd* takes a result folder and parses all files containing *results* in the folder.
+It also takes a variable name that has varied in this folder and plots the MSE's against the variable.
+
+## Classification
+viz_dimyvarying.Rmd plots the results of experiments that vary n = n_o*k and d = d_o *k^2 for k = 1,2,3,... 
+It may be possible to incorporate this into the viz_high_dim_varying_param.Rmd notebook, but this work is paused since the work on taking log d/n -> 0 has been paused.
+
 
 
 # Images

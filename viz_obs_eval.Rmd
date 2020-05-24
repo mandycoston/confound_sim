@@ -12,7 +12,7 @@ source("plot_utils.R")
 
 ```{r}
 # regression
-results_folder <- "results/highdim/regression/eval/"
+results_folder <- "results/highdim/regression/eval/p300/p300"
 results <- readRDS(glue::glue(results_folder, "results.Rds"))
 
 # to save images
@@ -30,5 +30,143 @@ results %>%
     low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
     high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
   ) 
+```
+
+> plot averages against each other
+
+```{r}
+results %>%
+  dplyr::filter(eval %in% c("true_reg_mse", "dr_observational")) %>%
+  dplyr::group_by(eval, method) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    count = n(),
+    vmse = var(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
+  ) %>%
+  dplyr::select(-vmse, -low, -high, -count) %>%
+  tidyr::pivot_wider(names_from = eval, values_from = mmse) %>%
+  ggplot(aes(x = true_reg_mse, y = dr_observational, color = method)) +
+  geom_point() +
+  theme_bw(base_size = 18)
+ggsave("img/obs_eval_avg.pdf")
+```
+
+```{r}
+results %>%
+  dplyr::filter(eval %in% c("true_pred_mse", "dr_observational")) %>%
+  dplyr::group_by(eval, method) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    count = n(),
+    vmse = var(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
+  ) %>%
+  dplyr::select(-vmse, -low, -high, -count) %>%
+  tidyr::pivot_wider(names_from = eval, values_from = mmse) %>%
+  ggplot(aes(x = true_pred_mse, y = dr_observational, color = method)) +
+  geom_point() +
+  theme_bw(base_size = 18) +
+  ggsave("img/obs_eval_pred.pdf")
+```
+
+> show percentage of simulations in which the orders were the same for dr and true_reg
+
+```{r}
+results %>%
+  group_by(sim, eval) %>%
+  mutate(rnk = min_rank(mse))%>%
+  ungroup() %>%
+  group_by(sim, method) %>%
+  filter(eval %in% c("true_reg_mse", "dr_observational")) %>%
+  select(mse, method, eval, sim, rnk) %>%  
+  summarise(discr = var(rnk)) %>%
+  ungroup() %>%
+  group_by(sim) %>%
+  summarise(discr_sim = as.integer(max(discr) >0)) %>%
+  summary()
+
+```
+
+> show percentage of simulations in which the orders were the same for dr and true_pred
+
+```{r}
+results %>%
+  select(mse, method, eval, sim) %>%  
+  group_by(sim, eval) %>%
+  mutate(rnk = min_rank(mse)) %>%
+  ungroup() %>%
+  group_by(sim, method) %>%
+  filter(eval %in% c("true_pred_mse", "dr_observational")) %>%
+  summarise(discr = var(rnk)) %>%
+  ungroup() %>%
+  group_by(sim) %>%
+  summarise(discr_sim = as.integer(max(discr) >0)) %>%
+  summary()
+
+```
+
+> show percentage of simulations in which rank 1 was the same for dr and true_reg
+
+```{r}
+results %>%
+  select(mse, method, eval, sim) %>%  
+  group_by(sim, eval) %>%
+  mutate(rnk = min_rank(mse))%>%
+  ungroup() %>%
+  group_by(sim) %>%
+  filter(eval %in% c("true_reg_mse", "dr_observational"),
+         rnk == 1) %>%
+  mutate(same = as.integer(first(method) == last(method))) %>%
+  ungroup() %>%
+  group_by(sim) %>%
+  summary()
+
+```
+
+
+> show percentage of simulations in which rank 1 was the same for dr and true_pred
+
+```{r}
+results %>%
+  select(mse, method, eval, sim) %>%  
+  group_by(sim, eval) %>%
+  mutate(rnk = min_rank(mse))%>%
+  ungroup() %>%
+  group_by(sim) %>%
+  filter(eval %in% c("true_pred_mse", "dr_observational"),
+         rnk == 1) %>%
+  mutate(same = as.integer(first(method) == last(method))) %>%
+  ungroup() %>%
+  group_by(sim) %>%
+  summary()
+
+```
+
+
+>  compare: show percentage of simulations in which rank 1 was the same for true_reg and true_pred
+
+```{r}
+results %>%
+  select(mse, method, eval, sim) %>%  
+  group_by(sim, eval) %>%
+  mutate(rnk = min_rank(mse))%>%
+  ungroup() %>%
+  group_by(sim) %>%
+  filter(eval %in% c("true_pred_mse", "true_reg_mse"),
+         rnk == 1) %>%
+  mutate(same = as.integer(first(method) == last(method))) %>%
+  ungroup() %>%
+  group_by(sim) %>%
+  summary()
+
+```
+
+```{r}
+results %>%
+  dplyr::filter(eval %in% c("true_reg_mse", "true_pred_mse", "dr_observational")) %>%
+  dplyr::filter(sim == 35)
 ```
 
