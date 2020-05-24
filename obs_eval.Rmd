@@ -98,7 +98,7 @@ results <- foreach(sim_num = 1:n_sim) %dopar% {
       mean(phi_pl[s == 4]) + 1.96 * sqrt(var(phi_pl[s == 4]) / length(phi_pl[s == 4])),
       mean(phi_bc[s == 4]) + 1.96 * sqrt(var(phi_bc[s == 4]) / length(phi_bc[s == 4]))
     ),
-    "method" = rep(c("conf", "pl", "bc"), 3),
+    "method" = rep(c("conf", "pl", "bc"), 5),
     "eval" = c(
       rep("true_reg_mse", 3),
       rep("true_pred_mse", 3),
