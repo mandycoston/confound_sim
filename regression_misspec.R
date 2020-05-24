@@ -9,18 +9,20 @@ start_time <- Sys.time()
 set.seed(100)
 results <- tibble()
 n <- 4 * 1000
-n_sim <- 20 #500
+n_sim <- 500
 d <- 500
 q <- 100 #20 # dimension of hidden confounder z
 p <- d - q # dimension of v
-zeta <- q # number of non-zero predictors in z
+zeta <- 20 # number of non-zero predictors in z
 gamma <- 24 # number of non-zero predictors in v
 beta <- gamma + zeta
-alpha <- 45
+alpha_z <- 20
+alpha_v <- 25
+alpha <- alpha_z + alpha_v
 s <- sort(rep(1:4, n / 4))
 
 # parallelize
-registerDoParallel(cores = 15)
+registerDoParallel(cores = 48)
 
 results <- foreach (sim_num = 1:n_sim) %dopar% {
   v_first_order <- matrix(rnorm(n * p/2), n, p/2)
@@ -36,7 +38,7 @@ results <- foreach (sim_num = 1:n_sim) %dopar% {
   nu <- as.numeric(    v_second_order %*% c(rep(c(1, -1), gamma/4), rep(0,p/2 - gamma/2))+
                          v_first_order %*% rep(c(1, 0), c(gamma/2, p/2 - gamma/2)))
   # prop is linear in v and z
-  prop <- sigmoid(as.numeric(x %*% rep(c(1, 0), c(alpha, d - alpha))) / sqrt(alpha))
+  prop <- sigmoid(as.numeric(x %*% rep(c(1, 0, 1, 0), c(alpha_z, q - alpha_z, alpha_v, p - alpha_v))) / sqrt(alpha))
   a <- rbinom(n, 1, prop)
   y0 <- mu0 + rnorm(n, sd = sqrt(sum(mu0^2) / (n * 2)))
   
@@ -53,11 +55,9 @@ results <- foreach (sim_num = 1:n_sim) %dopar% {
   # stage 2
   conf_lasso <- cv.glmnet(v_first_order[((s == 3) & (a == 0)), ], y0[((s == 3) & (a == 0))])
   conf <- predict(conf_lasso, newx = v_first_order, s = "lambda.min")
-  conf1se <- predict(conf_lasso, newx = v_first_order)
   
   pl_lasso <- cv.glmnet(v_first_order[s == 3, ], muhat[s == 3])
   pl <- predict(pl_lasso, newx = v_first_order, s = "lambda.min")
-  pl1se <- predict(pl_lasso, newx = v_first_order)
   
   bc_lasso <- cv.glmnet(v_first_order[s == 3, ], bchat[s == 3])
   bc <- predict(bc_lasso, newx = v_first_order, s = "lambda.min")
@@ -70,11 +70,9 @@ results <- foreach (sim_num = 1:n_sim) %dopar% {
       mean((conf - nu)[s == 4]^2),
       mean((pl - nu)[s == 4]^2),
       mean((bc - nu)[s == 4]^2),
-      mean((bct - nu)[s == 4]^2),
-      mean((conf1se - nu)[s == 4]^2),
-      mean((pl1se - nu)[s == 4]^2)
+      mean((bct - nu)[s == 4]^2)
     ),
-    "method" = c("conf", "pl", "bc", "bct", "conf1se", "pl1se"),
+    "method" = c("conf", "pl", "bc", "bct"),
     "sim" = sim_num
   )
 }
