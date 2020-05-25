@@ -41,7 +41,8 @@ regression_vary_zeta_fix_gamma.R : varies zeta and beta, fixing gamma
 ### Misspecification
 regression_misspec.R (high_dim_misspec.Rmd for debugging) uses second-order V terms in the first stage only so that the second-stage is misspecified.
 
-
+### Correlation 
+regression_cor_vary_zeta_fixed_gamma.R specifies correlation
 
 
 # Result Data Files

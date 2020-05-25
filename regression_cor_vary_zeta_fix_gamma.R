@@ -4,14 +4,15 @@ library(doParallel)
 source("utils.R")
 
 # This script varies zeta and beta, holding gamma, alpha, p, d, q fixed.
-results_folder <- "results/highdim/regression/prop_widen/cor/varyparams/vary_zeta_fix_gamma/"
+results_folder <- "results/highdim/regression/prop_widen/neg_cor/varyparams/vary_zeta_fix_gamma/"
 start_time <- Sys.time()
 set.seed(100)
 
 registerDoParallel(cores = 48)
 
-for (m in c(0.2, 0.4, 0.6, 0.8, 1)) {
-  for (zeta in seq(0, 50, 5)) {
+for (m in c(0, 0.25, 0.5, 0.75, 1)) {
+ # for (zeta in seq(0, 50, 5)) {
+  for (zeta in seq(0, 45, 15)) {
     results <- tibble()
     n <- 4 * 1000
     n_sim <- 500
@@ -24,17 +25,18 @@ for (m in c(0.2, 0.4, 0.6, 0.8, 1)) {
     alpha_v <- 25
     alpha <- alpha_z + alpha_v
     s <- sort(rep(1:4, n / 4))
+    cf <- gamma/(m*zeta + gamma)# coefficient on sparse predictors, formerly 1
 
 
 
     results <- foreach(sim_num = 1:n_sim) %dopar% {
       v <- matrix(rnorm(n * p), n, p)
       means <- as.vector(v[, 1:q])
-      z <- matrix(rnorm(n * q, mean = -m * means), n, q)
+      z <- matrix(rnorm(n * q, mean = -m * means), n, q) #note the negative correlation
       # cor(v[,99], z[,99])
       x <- cbind(z, v)
-      mu0 <- as.numeric(x %*% rep(c(1, 0, 1, 0), c(zeta, q - zeta, gamma, p - gamma)))
-      nu <- as.numeric(x %*% rep(c(0, 1, 0), c(q, gamma, p - gamma))) + m * as.numeric(x %*% rep(c(0, 1, 0), c(q, zeta, p - zeta)))
+      mu0 <- as.numeric(x %*% rep(c(cf, 0, cf, 0), c(zeta, q - zeta, gamma, p - gamma)))
+      nu <- as.numeric(x %*% rep(c(0, cf, 0), c(q, gamma, p - gamma))) + m * as.numeric(x %*% rep(c(0, cf, 0), c(q, zeta, p - zeta)))
       prop <- sigmoid(as.numeric(x %*% rep(c(1, 0, 1, 0), c(alpha_z, q - alpha_z, alpha_v, p - alpha_v))) / sqrt(alpha))
       a <- rbinom(n, 1, prop)
       y0 <- mu0 + rnorm(n, sd = sqrt(sum(mu0^2) / (n * 2)))
