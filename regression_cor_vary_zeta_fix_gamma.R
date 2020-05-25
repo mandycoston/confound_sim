@@ -30,7 +30,7 @@ for (m in c(0.2, 0.4, 0.6, 0.8, 1)) {
     results <- foreach(sim_num = 1:n_sim) %dopar% {
       v <- matrix(rnorm(n * p), n, p)
       means <- as.vector(v[, 1:q])
-      z <- matrix(rnorm(n * q, mean = m * means), n, q)
+      z <- matrix(rnorm(n * q, mean = -m * means), n, q)
       # cor(v[,99], z[,99])
       x <- cbind(z, v)
       mu0 <- as.numeric(x %*% rep(c(1, 0, 1, 0), c(zeta, q - zeta, gamma, p - gamma)))
