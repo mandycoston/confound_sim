@@ -19,8 +19,8 @@ for (zeta in seq(0, 50, 5)) {
   q <- d - p
   gamma <- 25 # number of non-zero predictors in v
   beta <- gamma + zeta
-  alpha_z <- 20
-  alpha_v <- 25
+  alpha_z <- zeta#20
+  alpha_v <- gamma#25
   alpha <- alpha_z + alpha_v
   s <- sort(rep(1:2, n / 2))
   

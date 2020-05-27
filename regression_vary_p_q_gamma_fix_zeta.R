@@ -21,8 +21,8 @@ for (p in seq(50, 450, 50)) {
   zeta <- 20 # number of non-zero predictors in z
   gamma <- round(p/16)#25 # number of non-zero predictors in v
   beta <- gamma + zeta
-  alpha_z <- 20
-  alpha_v <- 25
+  alpha_z <- zeta#20
+  alpha_v <- gamma
   alpha <- alpha_z + alpha_v
   s <- sort(rep(1:4, n / 4))
   
@@ -45,37 +45,25 @@ for (p in seq(50, 450, 50)) {
     mu_lasso <- cv.glmnet(x[((s == 2) & (a == 0)), ], y0[((s == 2) & (a == 0))])
     muhat <- as.numeric(predict(mu_lasso, newx = x))
     
-    
     bchat <- (1 - a) * (y0 - muhat) / (1 - prophat) + muhat
-    bc_true <- (1 - a) * (y0 - mu0) / (1 - prop) + mu0
-    bc_true_prop <- (1 - a) * (y0 - muhat) / (1 - prop) + muhat
-    bc_true_mu <- (1 - a) * (y0 - mu0) / (1 - prophat) + mu0
-    bc_rct <- (1 - a) * (y0 - mu0) / (1 - mean(a)) + mu0
     
     # stage 2
     conf_lasso <- cv.glmnet(v[((s == 3) & (a == 0)), ], y0[((s == 3) & (a == 0))])
     conf <- predict(conf_lasso, newx = v, s = "lambda.min")
-    conf1se <- predict(conf_lasso, newx = v)
     
     pl_lasso <- cv.glmnet(v[s == 3, ], muhat[s == 3])
     pl <- predict(pl_lasso, newx = v, s = "lambda.min")
-    pl1se <- predict(pl_lasso, newx = v)
     
     bc_lasso <- cv.glmnet(v[s == 3, ], bchat[s == 3])
     bc <- predict(bc_lasso, newx = v, s = "lambda.min")
-    
-    bct_lasso <- cv.glmnet(v[s == 3, ], bc_true[s == 3])
-    bct <- predict(bct_lasso, newx = v, s = "lambda.min")
-    
     
     tibble(
       "mse" = c(
         mean((conf - nu)[s == 4]^2),
         mean((pl - nu)[s == 4]^2),
-        mean((bc - nu)[s == 4]^2),
-        mean((bct - nu)[s == 4]^2)
+        mean((bc - nu)[s == 4]^2)
       ),
-      "method" = c("conf", "pl", "bc", "bct"),
+      "method" = c("conf", "pl", "bc"),
       "sim" = sim_num,
       "prop_nnzero" = nnzero(coef(prop_lasso, s=prop_lasso$lambda.1se)),
       "mu_nnzero" = nnzero(coef(mu_lasso, s=mu_lasso$lambda.1se)),

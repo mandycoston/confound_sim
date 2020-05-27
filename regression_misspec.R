@@ -17,7 +17,7 @@ zeta <- 20 # number of non-zero predictors in z
 gamma <- 24 # number of non-zero predictors in v
 beta <- gamma + zeta
 alpha_z <- 20
-alpha_v <- 25
+alpha_v <- gamma#25 #updated but not run
 alpha <- alpha_z + alpha_v
 s <- sort(rep(1:4, n / 4))
 

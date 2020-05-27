@@ -21,8 +21,8 @@ for (p in seq(50, 450, 50)) {
   zeta <- round(q/16) #20 # number of non-zero predictors in z
   gamma <- round(p/16)#25 # number of non-zero predictors in v
   beta <- gamma + zeta
-  alpha_z <- 20
-  alpha_v <- 25
+  alpha_z <- zeta
+  alpha_v <- gamma
   alpha <- alpha_z + alpha_v
   s <- sort(rep(1:4, n / 4))
   
@@ -33,7 +33,7 @@ for (p in seq(50, 450, 50)) {
     v <- x[, (q + 1):d]
     mu0 <- as.numeric(x %*% rep(c(1, 0, 1, 0), c(zeta, q - zeta, gamma, p - gamma)))
     nu <- as.numeric(x %*% rep(c(0, 1, 0), c(q, gamma, p - gamma)))
-    prop <- sigmoid(as.numeric(x %*% rep(c(1, 0, 1, 0), c(alpha_z, q - alpha_z, alpha_v, p - alpha_v))) / sqrt(4 * alpha))
+    prop <- sigmoid(as.numeric(x %*% rep(c(1, 0, 1, 0), c(alpha_z, q - alpha_z, alpha_v, p - alpha_v))) / sqrt(alpha))
     
     a <- rbinom(n, 1, prop)
     y0 <- mu0 + rnorm(n, sd = sqrt(sum(mu0^2) / (n * 2)))

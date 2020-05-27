@@ -12,6 +12,8 @@ source("plot_utils.R")
 
 This notebook visualizes the simulation results that vary with a variable: var_param
 
+> experimental and often problematic results
+
 ```{r}
 # results on tighter propensities binary
 # results_folder <- "results/highdim/binary/varyparams/varyalphaz/"
@@ -37,6 +39,7 @@ This notebook visualizes the simulation results that vary with a variable: var_p
 
 # results_folder <- "results/highdim/regression/prop_widen/varyparams/varyalphaz/"
 # var_param <- quo(alpha_z)
+# img_folder <- "img/alpha_z_"
 
 # results_folder <- "results/highdim/regression/prop_widen/varyparams/vary_zeta_fix_gamma/"
 # var_param <- quo(zeta)
@@ -67,13 +70,33 @@ This notebook visualizes the simulation results that vary with a variable: var_p
 # var_param <- quo(m)
 # img_folder <- "img/cor_"
 
-results_folder <- "results/highdim/regression/prop_widen/rf/"
-var_param <- quo(algorithm)
-img_folder <- "img/rf_test_"
+# results_folder <- "results/highdim/regression/prop_widen/neg_cor/varyparams/vary_zeta_fix_gamma/"
+# var_param <- quo(m)
+# img_folder <- "img/neg_cor_"
+
+# results_folder <- "results/highdim/regression/prop_widen/rf/"
+# var_param <- quo(algorithm)
+# img_folder <- "img/rf_test_"
+
+# fl = list.files(results_folder, pattern = ".results.")
+# setwd(results_folder)
+# results <- bind_rows(lapply(fl, readRDS))
+```
+
+
+> paper results
+
+```{r}
+
+# Vary zeta/alphaz for rho = .25 correlated
+results_folder <- "results/paper/vary_zeta_fix_gamma_rho25/"
+var_param <- quo(zeta)
+img_folder <- "img/rho25_"
 
 fl = list.files(results_folder, pattern = ".results.")
 setwd(results_folder)
 results <- bind_rows(lapply(fl, readRDS))
+
 ```
 
 ```{r}
@@ -118,62 +141,52 @@ ggsave(glue::glue(img_folder, "exper.pdf"))
 
 ```{r}
 results %>%
-  dplyr::filter(method %in% c("bc", "bct", "conf", "pl"))%>%
+  dplyr::filter(method %in% c("bc", "bct", "conf", "pl", "regression_diff"))%>%
   dplyr::mutate(method = factor(recode(method,
                                 bc = "DR",
                                 bct = "Oracle DR",
-                                conf = "BTR",
+                                conf = "TCR",
                                 pl = "PL"),
                 levels = rev(c("Oracle DR",
                            "DR",
                            "PL",
-                           "BTR"))))-> results
+                           "TCR"))))-> results
 ```
 
 
 
 
-# for m plot for V-Z Correlated (TODO: update)
+# for m plot for V-Z Correlated
 perhaps error increases overall since the coefficients are larger with larger m
 > for correlated V-Z to visualize m for a given zeta
 
+for  zeta= 0, error increases slightly with m because the propensity distribution widens (so we have less training examples for certain parts of feature space)
+for zeta = 30, 45 error blows up when coefficient in mu model is 10 (resp at -0.75, -0.5)
+
 ```{r}
-# results %>%
-#   dplyr::mutate(method = factor(recode(results$method,
-#                                 bc = "DR",
-#                                 bct = "Oracle DR",
-#                                 conf = "BTR",
-#                                 pl = "PL"),
-#                 levels = rev(c("Oracle DR",
-#                            "pl1se",
-#                            "conf1se", "regression_diff", "bc_true_mu", "bc_true_prop", "bc_rt",
-#                            "DR",
-#                            "PL",
-#                            "BTR"))))-> results
-# results %>%
-#   dplyr::filter(zeta == 25) %>%
-#   dplyr::group_by(!! var_param, method) %>%
-#   dplyr::filter(!(method %in% c("Oracle DR"))) %>%
-#   dplyr::summarise(
-#     mmse = mean(mse),
-#     low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
-#     high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
-#   ) %>%
-#   ggplot(aes(x = !! var_param, y = mmse, color = method)) +
-#   geom_point(size = 1.25) +
-#   geom_errorbar(aes(ymin = low, ymax = high), width = 0.1) +
-#   ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
-# xlab(TeX("$m$")) +
-#   scale_color_manual(values = cbPalette) +
-#   theme_bw(base_size = 18) +
-#   theme(legend.position = c(0.87, 0.21), legend.title = element_blank())
-# 
-# 
-# ggsave(glue::glue(img_folder, "vary_m.pdf"), width = 10, height = 8)
-# 
-# results %>% filter(m == 0.4) ->  results
-# var_param <- quo(zeta)
+z <- 15
+results %>%
+  dplyr::filter(zeta == z) %>% 
+#,m >= -0.5) %>%
+  dplyr::group_by(!! var_param, method) %>%
+  dplyr::filter(!(method %in% c("Oracle DR"))) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+  geom_point(size = 1.25) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 0.1) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+xlab(TeX("$\\rho_{V_i, Z_i}$")) +
+  scale_color_manual(values = cbPalette) +
+  theme_bw(base_size = 18) +
+  theme(legend.position = c(0.87, 0.81), legend.title = element_blank())
+
+ggsave(glue::glue(img_folder, "varym_zeta{z}.pdf"), width = 10, height = 8)
 ```
+
 
 # for alpha_z plot
 ```{r}
@@ -214,20 +227,12 @@ perhaps error increases overall since the coefficients are larger with larger m
 
 # for zeta plot
 
+> may need to remove line that filters by m for uncorrelated setting
+
 
 ```{r}
-results %>%
-  dplyr::mutate(method = factor(recode(results$method,
-                                bc = "DR",
-                                bct = "Oracle DR",
-                                conf = "BTR",
-                                pl = "PL"),
-                levels = rev(c("Oracle DR",
-                           "pl1se",
-                           "conf1se", "regression_diff", "bc_true_mu", "bc_true_prop", "bc_rt",
-                           "DR",
-                           "PL",
-                           "BTR"))))-> results
+var_param <- quo(zeta)
+
 results %>%
   dplyr::group_by(!! var_param, method) %>%
   dplyr::filter(!(method %in% c("Oracle DR"))) %>%

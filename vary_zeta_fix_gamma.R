@@ -5,18 +5,17 @@ source("utils.R")
 
 # This script varies zeta and beta, holding gamma, alpha, p, d, q fixed.
 #results_folder <- "results/highdim/regression/prop_widen/cor/varyparams/vary_zeta_fix_gamma_rho25/"
-#results_folder <- "results/highdim/regression/prop_widen/cor/varyparams/vary_zeta_fix_gamma_rho/"
+results_folder <- "results/paper/vary_zeta_fix_gamma/"
 start_time <- Sys.time()
 set.seed(100)
 
-registerDoParallel(cores = 48)
+registerDoParallel(cores = 14)
 
-#for (m in c( -c(0.25, 0.5, 0.75, 1), c(0, 0.25, 0.5, 0.75, 1))) {
+for (m in  c(0)) {
 for (zeta in seq(0, 50, 5)) {
-    m <- 0 # correlation coefficient rho
     results <- tibble()
     n <- 4 * 1000
-    n_sim <- 500
+    n_sim <- 3#500
     d <- 500
     p <- 400
     q <- d - p
@@ -105,6 +104,7 @@ for (zeta in seq(0, 50, 5)) {
     ), glue::glue(results_folder, "zeta{zeta}_mhash{(m+2)*100}", "parameters.Rds"))
 
     saveRDS(bind_rows(results), glue::glue(results_folder, "zeta{zeta}_mhash{(m+2)*100}", "results.Rds"))
-  }
+}
+}
 task_time <- difftime(Sys.time(), start_time)
 print(task_time)

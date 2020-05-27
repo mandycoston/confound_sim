@@ -32,6 +32,15 @@ high_dim_regression.Rmd/.R has code for one-off parameter specifications
 regression_calib.R (respectively .Rmd for debugging) runs experiments with a workable parameter setting and saves the predictions for calibration-style plots
 
 ### Varying parameters
+New paradigm uses correlated structure, setting m= 0 for uncorrelated:
+vary_zeta_fix_gamma.R
+vary_p_q_gamma_fix_zeta.R 
+vary_p_q_gamma_zeta.R: varies p = 16*gamma and q = d- p and zeta = round(q/16)
+vary_p_q_gamma_zeta5.R: varies p = 16*gamma and q = d- p and zeta = round(q/5)
+
+
+
+#### old
 regression_vary_p.R: varies p and q, fixing d, gamma and zeta
 regression_vary_p_q_gamma_zeta.R: varies p = 16*gamma and q = d- p and zeta = round(q/16)
 regression_vary_alpha_z.R

@@ -3,33 +3,34 @@ library(glmnet)
 library(doParallel)
 source("utils.R")
 
-# This script varies zeta and beta, holding gamma, alpha, p, d, q fixed.
-#results_folder <- "results/highdim/regression/prop_widen/cor/varyparams/vary_zeta_fix_gamma_rho25/"
-#results_folder <- "results/highdim/regression/prop_widen/cor/varyparams/vary_zeta_fix_gamma_rho/"
+
+# This script performs high dimensional sparse regression when varying p = 16*gamma
+# and q = d - p and q = 5*zeta
+results_folder <- "results/paper/vary_p_q_gamma_zeta5/"
 start_time <- Sys.time()
 set.seed(100)
 
 registerDoParallel(cores = 48)
 
-#for (m in c( -c(0.25, 0.5, 0.75, 1), c(0, 0.25, 0.5, 0.75, 1))) {
-for (zeta in seq(0, 50, 5)) {
-    m <- 0 # correlation coefficient rho
+for (m in c(0, 0.25)) {
+  for (p in seq(50, 450, 50)) {
+    # for (p in seq(100, 400, 100)) {
     results <- tibble()
     n <- 4 * 1000
     n_sim <- 500
     d <- 500
-    p <- 400
     q <- d - p
-    gamma <- 25 # number of non-zero predictors in v
+    zeta <- round(q/5) #20 # number of non-zero predictors in z
+    gamma <- round(p/16)#25 # number of non-zero predictors in v
     beta <- gamma + zeta
-    alpha_z <- zeta#20 # updated alphaz = zeta
+    alpha_z <- zeta 
     alpha_v <- gamma
     alpha <- alpha_z + alpha_v
     s <- sort(rep(1:4, n / 4))
     cf <- gamma/(m*zeta + gamma)# coefficient on sparse predictors, formerly 1
-
-
-
+    
+    
+    
     results <- foreach(sim_num = 1:n_sim) %dopar% {
       v <- matrix(rnorm(n * p), n, p)
       means <- as.vector(v[, 1:q])
@@ -41,20 +42,20 @@ for (zeta in seq(0, 50, 5)) {
       prop <- sigmoid(as.numeric(x %*% rep(c(1, 0, 1, 0), c(alpha_z, q - alpha_z, alpha_v, p - alpha_v))) / sqrt(alpha))
       a <- rbinom(n, 1, prop)
       y0 <- mu0 + rnorm(n, sd = sqrt(sum(mu0^2) / (n * 2)))
-
+      
       # stage 1
       prop_lasso <- cv.glmnet(x[s == 1, ], a[s == 1], family = "binomial")
       prophat <- as.numeric(predict(prop_lasso, newx = x, type = "response"))
-
+      
       mu_lasso <- cv.glmnet(x[((s == 2) & (a == 0)), ], y0[((s == 2) & (a == 0))])
       muhat <- as.numeric(predict(mu_lasso, newx = x))
-
+      
       bchat <- (1 - a) * (y0 - muhat) / (1 - prophat) + muhat
-
+      
       # stage 2
       conf_lasso <- cv.glmnet(v[((s == 3) & (a == 0)), ], y0[((s == 3) & (a == 0))])
       conf <- predict(conf_lasso, newx = v, s = "lambda.min")
-
+      
       if(var(muhat[s==3]) > 0) {
         pl_lasso <- cv.glmnet(v[s == 3, ], muhat[s == 3])
         pl <- predict(pl_lasso, newx = v, s = "lambda.min")
@@ -66,10 +67,10 @@ for (zeta in seq(0, 50, 5)) {
                        sim_num = sim_num), glue::glue(results_folder, "m{m}_sim{sim_num}constant_mu.Rds"))
         pl <- muhat
       }
-
+      
       bc_lasso <- cv.glmnet(v[s == 3, ], bchat[s == 3])
       bc <- predict(bc_lasso, newx = v, s = "lambda.min")
-
+      
       tibble(
         "mse" = c(
           mean((conf - nu)[s == 4]^2),
@@ -102,9 +103,10 @@ for (zeta in seq(0, 50, 5)) {
       "alpha_v" = alpha_v,
       "alpha_z" = alpha_z,
       "alpha" = alpha
-    ), glue::glue(results_folder, "zeta{zeta}_mhash{(m+2)*100}", "parameters.Rds"))
-
-    saveRDS(bind_rows(results), glue::glue(results_folder, "zeta{zeta}_mhash{(m+2)*100}", "results.Rds"))
+    ), glue::glue(results_folder, "p{p}_mhash{(m+2)*100}", "parameters.Rds"))
+    
+    saveRDS(bind_rows(results), glue::glue(results_folder, "p{p}_mhash{(m+2)*100}", "results.Rds"))
   }
+}
 task_time <- difftime(Sys.time(), start_time)
 print(task_time)
