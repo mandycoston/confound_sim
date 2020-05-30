@@ -1,0 +1,315 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Code for generating figures for supplementary 
+
+```{r}
+library(tidyverse)
+library(latex2exp)
+#library(plotly)
+source("plot_utils.R")
+
+rename_methods <- function(df) {
+  return(mutate(df,method = factor(recode(method,
+                                bc = "DR",
+                                conf = "TCR",
+                                pl = "PL"),
+                levels = rev(c(
+                           "DR",
+                           "PL",
+                           "TCR")))))
+}
+```
+
+# Vary p, q, gamma but fix zeta for m = 0 and m = 0.25 [rerunning at 100 sim]
+
+```{r}
+results_folder <- "results/paper/vary_p_q_gamma_fix_zeta/"
+var_param <- quo(p)
+img_folder <- "img/vary_p_q_gamma_fix_zeta_"
+
+
+fl = list.files(results_folder, pattern = ".results.")
+setwd(results_folder)
+results <- bind_rows(lapply(fl, readRDS)) %>% rename_methods()
+```
+
+
+> uncorrelated lasso
+
+```{r}
+results %>%
+  dplyr::filter(m == 0, algorithm == "LASSO") %>%
+  dplyr::group_by(!! var_param, method) %>%
+  dplyr::filter(! (method %in% c("Oracle DR"))) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+  geom_point(size = 1.5) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+ scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
+ xlab(TeX("$d_v$")) +
+  scale_color_manual(values = cbPalette[1:4])+
+  theme_bw(base_size = 21) +
+   theme(legend.position = c(0.8, 0.24), legend.title = element_blank())
+
+#ggsave(glue::glue(img_folder, "m0.pdf"), width =5, height = 4)
+```
+> uncorrelated Rf
+
+```{r}
+results %>%
+  dplyr::filter(m == 0, algorithm == "RF") %>%
+  dplyr::group_by(!! var_param, method) %>%
+  dplyr::filter(! (method %in% c("Oracle DR"))) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+  geom_point(size = 1.5) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+ scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
+ xlab(TeX("$d_v$")) +
+  scale_color_manual(values = cbPalette[1:4])+
+  theme_bw(base_size = 21) +
+   theme(legend.position = c(0.8, 0.24), legend.title = element_blank())
+
+#ggsave(glue::glue(img_folder, "m0.pdf"), width =5, height = 4)
+```
+
+> correlated LASSO
+
+```{r}
+results %>%
+  dplyr::filter(m == 0.25, algorithm == "LASSO") %>%
+  dplyr::group_by(!! var_param, method) %>%
+  dplyr::filter(! (method %in% c("Oracle DR"))) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+  geom_point(size = 1.5) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+ scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
+ xlab(TeX("$d_v$")) +
+  scale_color_manual(values = cbPalette[1:4])+
+  theme_bw(base_size = 21) +
+   theme(legend.position = c(0.8, 0.24), legend.title = element_blank())
+
+#ggsave(glue::glue(img_folder, "m25.pdf"), width =5, height = 4)
+```
+
+
+> correlated RF
+
+```{r}
+results %>%
+  dplyr::filter(m == 0.25, algorithm == "RF") %>%
+  dplyr::group_by(!! var_param, method) %>%
+  dplyr::filter(! (method %in% c("Oracle DR"))) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+  geom_point(size = 1.5) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+ scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
+ xlab(TeX("$d_v$")) +
+  scale_color_manual(values = cbPalette[1:4])+
+  theme_bw(base_size = 21) +
+   theme(legend.position = c(0.8, 0.24), legend.title = element_blank())
+
+#ggsave(glue::glue(img_folder, "m25.pdf"), width =5, height = 4)
+```
+
+
+
+
+
+# Vary p, q, gamma and zeta but zeta at a different ratio than gamma [100 sim, running]
+
+```{r}
+results_folder <- "results/paper/vary_p_q_gamma_zeta5/"
+var_param <- quo(p)
+img_folder <- "img/vary_p_q_zeta5_"
+
+
+fl = list.files(results_folder, pattern = ".results.")
+setwd(results_folder)
+results <- bind_rows(lapply(fl, readRDS)) %>% rename_methods()
+
+```
+
+
+> correlated lasso
+
+```{r}
+results %>%
+  dplyr::filter(m == 0.25, algorithm == "LASSO") %>%
+  dplyr::group_by(!! var_param, method) %>%
+  dplyr::filter(! (method %in% c("Oracle DR"))) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+  geom_point(size = 1.5) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+ scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
+ xlab(TeX("$d_v$")) +
+  scale_color_manual(values = cbPalette[1:4])+
+  theme_bw(base_size = 21) +
+   theme(legend.position = c(0.8, 0.24), legend.title = element_blank())
+
+#ggsave(glue::glue(img_folder, "m25.pdf"), width =5, height = 4)
+```
+
+> correlated rf
+
+```{r}
+results %>%
+  dplyr::filter(m == 0.25, algorithm == "RF") %>%
+  dplyr::group_by(!! var_param, method) %>%
+  dplyr::filter(! (method %in% c("Oracle DR"))) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+  geom_point(size = 1.5) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+ scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
+ xlab(TeX("$d_v$")) +
+  scale_color_manual(values = cbPalette[1:4])+
+  theme_bw(base_size = 21) +
+   theme(legend.position = c(0.8, 0.24), legend.title = element_blank())
+
+#ggsave(glue::glue(img_folder, "m25.pdf"), width =5, height = 4)
+```
+
+> uncorrelated LASSO
+
+```{r}
+results %>%
+  dplyr::filter(m == 0, algorithm == "LASSO") %>%
+  dplyr::group_by(!! var_param, method) %>%
+  dplyr::filter(! (method %in% c("Oracle DR"))) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+  geom_point(size = 1.5) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+ scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
+ xlab(TeX("$d_v$")) +
+  scale_color_manual(values = cbPalette[1:4])+
+  theme_bw(base_size = 21) +
+   theme(legend.position = c(0.8, 0.24), legend.title = element_blank())
+```
+> uncorrelated RF
+
+```{r}
+results %>%
+  dplyr::filter(m == 0, algorithm == "RF") %>%
+  dplyr::group_by(!! var_param, method) %>%
+  dplyr::filter(! (method %in% c("Oracle DR"))) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+  geom_point(size = 1.5) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+ scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
+ xlab(TeX("$d_v$")) +
+  scale_color_manual(values = cbPalette[1:4])+
+  theme_bw(base_size = 21) +
+   theme(legend.position = c(0.8, 0.24), legend.title = element_blank())
+```
+
+
+
+# Vary p, q, gamma and zeta at equal ratios [no RF, 500 sim]
+Note that TCR does well at high p since zeta is small there
+
+```{r}
+results_folder <- "results/paper/vary_p_q_gamma_zeta/"
+var_param <- quo(p)
+img_folder <- "img/vary_p_q_gamma_zeta_"
+
+
+fl = list.files(results_folder, pattern = ".results.")
+setwd(results_folder)
+results <- bind_rows(lapply(fl, readRDS)) %>% rename_methods()
+```
+
+
+> correlated
+
+```{r}
+results %>%
+  dplyr::filter(m == 0.25) %>%
+  dplyr::group_by(!! var_param, method) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+  geom_point(size = 1.5) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+ scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
+ xlab(TeX("$d_v$")) +
+  scale_color_manual(values = cbPalette[1:4])+
+  theme_bw(base_size = 21) +
+   theme(legend.position = c(0.8, 0.24), legend.title = element_blank())
+
+#ggsave(glue::glue(img_folder, "m25.pdf"), width =5, height = 4)
+```
+> uncorrelated
+
+```{r}
+results %>%
+  dplyr::filter(m == 0) %>%
+  dplyr::group_by(!! var_param, method) %>%
+  dplyr::filter(! (method %in% c("Oracle DR"))) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+  geom_point(size = 1.5) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+ scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
+ xlab(TeX("$d_v$")) +
+  scale_color_manual(values = cbPalette[1:4])+
+  theme_bw(base_size = 21) +
+   theme(legend.position = c(0.8, 0.24), legend.title = element_blank())
+```
