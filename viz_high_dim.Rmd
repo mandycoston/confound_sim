@@ -37,14 +37,16 @@ results_folder <- "results/highdim/binary/miss_prop_widen/"
 
 #results_folder <- "results/highdim/regression/prop_widen/misspec/" 
 
-results_folder <- "results/highdim/regression/prop_widen/varyparams/vary_zeta_fix_gamma/" 
+#results_folder <- "results/highdim/regression/prop_widen/cor/" 
 
+  
 results <- readRDS(glue::glue(results_folder,"results.Rds"))
 parameters <- readRDS(glue::glue(results_folder, "parameters.Rds"))
 
 #img_folder <- "img/regression_"
 #img_folder <- "img/binary_"
 img_folder <- "img/test_"
+
 
 
 ```
