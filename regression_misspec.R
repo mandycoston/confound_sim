@@ -3,26 +3,26 @@ library(glmnet)
 library(doParallel)
 source("utils.R")
 
-results_folder <- "results/highdim/regression/prop_widen/misspec/"
+results_folder <- "results/paper/misspec/"
 start_time <- Sys.time()
 #set.seed(3)
 set.seed(100)
 results <- tibble()
 n <- 4 * 1000
-n_sim <- 500
+n_sim <- 3
 d <- 500
 q <- 100 #20 # dimension of hidden confounder z
 p <- d - q # dimension of v
 zeta <- 20 # number of non-zero predictors in z
 gamma <- 24 # number of non-zero predictors in v
 beta <- gamma + zeta
-alpha_z <- 20
-alpha_v <- gamma#25 #updated but not run
+alpha_z <- zeta
+alpha_v <- gamma #25 #updated but not run
 alpha <- alpha_z + alpha_v
 s <- sort(rep(1:4, n / 4))
 
 # parallelize
-registerDoParallel(cores = 48)
+registerDoParallel(cores = 14)
 
 results <- foreach (sim_num = 1:n_sim) %dopar% {
   v_first_order <- matrix(rnorm(n * p/2), n, p/2)
@@ -62,17 +62,14 @@ results <- foreach (sim_num = 1:n_sim) %dopar% {
   bc_lasso <- cv.glmnet(v_first_order[s == 3, ], bchat[s == 3])
   bc <- predict(bc_lasso, newx = v_first_order, s = "lambda.min")
   
-  bct_lasso <- cv.glmnet(v_first_order[s == 3, ], bc_true[s == 3])
-  bct <- predict(bct_lasso, newx = v_first_order, s = "lambda.min")
   
   tibble(
     "mse" = c(
       mean((conf - nu)[s == 4]^2),
       mean((pl - nu)[s == 4]^2),
-      mean((bc - nu)[s == 4]^2),
-      mean((bct - nu)[s == 4]^2)
+      mean((bc - nu)[s == 4]^2)
     ),
-    "method" = c("conf", "pl", "bc", "bct"),
+    "method" = c("conf", "pl", "bc"),
     "sim" = sim_num
   )
 }

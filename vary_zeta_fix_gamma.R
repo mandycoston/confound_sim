@@ -12,8 +12,13 @@ set.seed(100)
 
 registerDoParallel(cores = 48)
 
-for (m in  c(0)) {
+
 for (zeta in seq(0, 50, 5)) {
+  if(zeta %in% c(15, 20, 25)) {
+    pho_vals <- seq(-0.5, 1, 0.25)  }
+  if(!(zeta %in% c(15, 20, 25))) {
+    pho_vals <- c(0, 0.25)  }
+  for (m in  pho_vals) {
     results <- tibble()
     n <- 4 * 1000
     n_sim <- 500
@@ -63,45 +68,44 @@ for (zeta in seq(0, 50, 5)) {
         s = s
       )
       
-      prop_rf <- ranger("a ~.", data = select(filter(df, s == 1), colnames(x), a), probability = TRUE, num.trees = 1000)
-      prop_rf_hat <- as.numeric(predict(prop_rf, data = x, type = "response")$predictions[, 2])
-      
-      mu_rf <- ranger("y0 ~ .", data = select(filter(df, s == 2, a == 0), y0, colnames(x)), num.trees = 1000)
-      mu_rf_hat <- as.numeric(predict(mu_rf, data = x, type = "response")$predictions)
-
       # stage 1
       prop_lasso <- cv.glmnet(x[s == 1, ], a[s == 1], family = "binomial")
       prophat <- as.numeric(predict(prop_lasso, newx = x, type = "response"))
-
+      
+      prop_rf <- ranger("a ~.", data = select(filter(df, s == 1), colnames(x), a), probability = TRUE, num.trees = 1000)
+      prop_rf_hat <- as.numeric(predict(prop_rf, data = x, type = "response")$predictions[, 2])
+      
       mu_lasso <- cv.glmnet(x[((s == 2) & (a == 0)), ], y0[((s == 2) & (a == 0))])
       muhat <- as.numeric(predict(mu_lasso, newx = x))
-
+      
+      mu_rf <- ranger("y0 ~ .", data = select(filter(df, s == 2, a == 0), y0, colnames(x)), num.trees = 1000)
+      mu_rf_hat <- as.numeric(predict(mu_rf, data = x, type = "response")$predictions)
+      
       bchat <- (1 - a) * (y0 - muhat) / (1 - prophat) + muhat
       bc_rf_pseudo <- (1 - a) * (y0 - mu_rf_hat) / (1 - prop_rf_hat) + mu0
       
       df %>%
         dplyr::mutate(
-          bchat_rf_1st = bchat_rf_1st,
+          bc_rf_pseudo = bc_rf_pseudo,
           mu_rf_hat = mu_rf_hat
         ) -> df
       
       
-      conf_rf <- ranger(y0 ~ ., data = select(filter(df, s == 3, a == 0), y0, colnames(v)), num.trees = 1000)
-      conf_rf_hat <- as.numeric(predict(conf_rf, data = v, type = "response")$predictions)
-      pl_rf <- ranger(mu_rf_hat ~ ., data = select(filter(df, s == 3), mu_rf_hat, colnames(v)), num.trees = 1000)
-      pl_rf_hat <- as.numeric(predict(pl_rf, data = v, type = "response")$predictions)
-      bc_rf <- ranger(bc_rf_pseudo ~ ., data = select(filter(df, s == 3), bchat_rf_1st, colnames(v)), num.trees = 1000)
-      bc_rf_hat <- as.numeric(predict(bc_rf, data = v, type = "response")$predictions)
-      
-
       # stage 2
       conf_lasso <- cv.glmnet(v[((s == 3) & (a == 0)), ], y0[((s == 3) & (a == 0))])
       conf <- predict(conf_lasso, newx = v, s = "lambda.min")
-
+      
+      conf_rf <- ranger(y0 ~ ., data = select(filter(df, s == 3, a == 0), y0, colnames(v)), num.trees = 1000)
+      conf_rf_hat <- as.numeric(predict(conf_rf, data = v, type = "response")$predictions)
+      
+      
       if(var(muhat[s==3]) > 0) {
         pl_lasso <- cv.glmnet(v[s == 3, ], muhat[s == 3])
         pl <- predict(pl_lasso, newx = v, s = "lambda.min")
       }
+      
+      pl_rf <- ranger(mu_rf_hat ~ ., data = select(filter(df, s == 3), mu_rf_hat, colnames(v)), num.trees = 1000)
+      pl_rf_hat <- as.numeric(predict(pl_rf, data = v, type = "response")$predictions)
       
       if(var(muhat[s==3]) == 0) {
         saveRDS(tibble(m = m, 
@@ -109,9 +113,12 @@ for (zeta in seq(0, 50, 5)) {
                        sim_num = sim_num), glue::glue(results_folder, "m{m}_sim{sim_num}constant_mu.Rds"))
         pl <- muhat
       }
-
+      
       bc_lasso <- cv.glmnet(v[s == 3, ], bchat[s == 3])
       bc <- predict(bc_lasso, newx = v, s = "lambda.min")
+      
+      bc_rf <- ranger(bc_rf_pseudo ~ ., data = select(filter(df, s == 3), bc_rf_pseudo, colnames(v)), num.trees = 1000)
+      bc_rf_hat <- as.numeric(predict(bc_rf, data = v, type = "response")$predictions)
 
       tibble(
         "mse" = c(

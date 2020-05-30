@@ -11,9 +11,9 @@ set.seed(100)
 
 registerDoParallel(cores = 48)
 
-for (m in  c(0.25)) {
-  #for (p in seq(50, 400, 50)) {
-  for (p in seq(0, 400, 200)) {
+for (m in  c(0, 0.25)) {
+  for (p in seq(50, 400, 50)) {
+  #for (p in seq(100, 400, 100)) {
     results <- tibble()
     n <- 4 * 1000
     n_sim <- 500
@@ -32,7 +32,12 @@ for (m in  c(0.25)) {
     
     results <- foreach(sim_num = 1:n_sim) %dopar% {
       v <- matrix(rnorm(n * p), n, p)
-      means <- as.vector(v[, 1:q])
+      if(p >=q) {
+        means <- as.vector(v[, 1:q])
+      }
+      if(p < q) {
+        means <- c(as.vector(v), rep(0, q-p))
+      }
       z <- matrix(rnorm(n = n * q, mean = m * means, sd = sqrt(1-m^2)), n, q) #note the updated variance 
       # cor(v[,99], z[,99])
       x <- cbind(z, v)
@@ -82,7 +87,7 @@ for (m in  c(0.25)) {
       
       df %>%
         dplyr::mutate(
-          bchat_rf_1st = bchat_rf_1st,
+          bc_rf_pseudo = bc_rf_pseudo,
           mu_rf_hat = mu_rf_hat
         ) -> df
       
@@ -113,7 +118,7 @@ for (m in  c(0.25)) {
       bc_lasso <- cv.glmnet(v[s == 3, ], bchat[s == 3])
       bc <- predict(bc_lasso, newx = v, s = "lambda.min")
       
-      bc_rf <- ranger(bc_rf_pseudo ~ ., data = select(filter(df, s == 3), bchat_rf_1st, colnames(v)), num.trees = 1000)
+      bc_rf <- ranger(bc_rf_pseudo ~ ., data = select(filter(df, s == 3), bc_rf_pseudo, colnames(v)), num.trees = 1000)
       bc_rf_hat <- as.numeric(predict(bc_rf, data = v, type = "response")$predictions)
       
       tibble(

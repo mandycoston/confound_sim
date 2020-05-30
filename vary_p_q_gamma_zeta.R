@@ -3,6 +3,8 @@ library(glmnet)
 library(doParallel)
 source("utils.R")
 
+# MAY NEED TO UPDATE WITH RF IF YOU WANT 
+
 
 # This script performs high dimensional sparse regression when varying p = 16*gamma
 # and q = d - p and q = 16*zeta
@@ -33,7 +35,12 @@ for (m in c(0, 0.25)) {
     
     results <- foreach(sim_num = 1:n_sim) %dopar% {
       v <- matrix(rnorm(n * p), n, p)
-      means <- as.vector(v[, 1:q])
+      if(p >=q) {
+        means <- as.vector(v[, 1:q])
+      }
+      if(p < q) {
+        means <- c(as.vector(v), rep(0, q-p))
+      }
       z <- matrix(rnorm(n = n * q, mean = m * means, sd = sqrt(1-m^2)), n, q) #note the updated variance 
       # cor(v[,99], z[,99])
       x <- cbind(z, v)
