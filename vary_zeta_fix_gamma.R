@@ -6,7 +6,7 @@ source("utils.R")
 
 # This script varies zeta and beta, holding gamma, alpha, p, d, q fixed.
 #results_folder <- "results/highdim/regression/prop_widen/cor/varyparams/vary_zeta_fix_gamma_rho25/"
-results_folder <- "results/paper/vary_zeta_fix_gamma/"
+results_folder <- "results/paper/vary_zeta_p100/"
 start_time <- Sys.time()
 set.seed(100)
 
@@ -14,7 +14,7 @@ registerDoParallel(cores = 48)
 
 
 for (zeta in seq(0, 50, 5)) {
-  if(zeta %in% c(15, 20, 25)) {
+  if(zeta %in% c(15, 20)) {
     pho_vals <- seq(-0.5, 1, 0.25)  }
   if(!(zeta %in% c(15, 20, 25))) {
     pho_vals <- c(0, 0.25)  }
@@ -23,7 +23,7 @@ for (zeta in seq(0, 50, 5)) {
     n <- 4 * 1000
     n_sim <- 500
     d <- 500
-    p <- 400
+    p <- 100
     q <- d - p
     gamma <- 25 # number of non-zero predictors in v
     beta <- gamma + zeta
@@ -97,7 +97,6 @@ for (zeta in seq(0, 50, 5)) {
       
       conf_rf <- ranger(y0 ~ ., data = select(filter(df, s == 3, a == 0), y0, colnames(v)), num.trees = 1000)
       conf_rf_hat <- as.numeric(predict(conf_rf, data = v, type = "response")$predictions)
-      
       
       if(var(muhat[s==3]) > 0) {
         pl_lasso <- cv.glmnet(v[s == 3, ], muhat[s == 3])

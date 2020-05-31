@@ -11,25 +11,25 @@ set.seed(100)
 
 registerDoParallel(cores = 48)
 
-for (zeta in seq(0, 50, 10)) {
+for (p in seq(50, 400, 50)) {
   n <- 4 * 1000
   n_sim <- 500
   d <- 500
-  p <- 400
   q <- d - p
+  zeta <- 20
   gamma <- 25 # number of non-zero predictors in v
   s <- rep(c(1,2), c(3000, 1000))
   
-results <- learn_no_split(n_sim = n_sim, n = n, d = d, p = p, q = q, zeta = zeta, gamma = gamma, s = s) 
+  results <- learn_no_split(n_sim = n_sim, n = n, d = d, p = p, q = q, zeta = zeta, gamma = gamma, s = s) 
   saveRDS(tibble(    
     "dim" = d,
     "n_in_each_fold" = 3000,
     "q" = q,
     "p" = p,
     "zeta" = zeta,
-    "gamma" = gamma), glue::glue(results_folder, "zeta{zeta}", "parameters.Rds"))
+    "gamma" = gamma), glue::glue(results_folder, "p{p}", "parameters.Rds"))
   
-  saveRDS(bind_rows(results), glue::glue(results_folder,  "zeta{zeta}","results.Rds"))
+  saveRDS(bind_rows(results), glue::glue(results_folder,  "p{p}","results.Rds"))
 }
 
 task_time <- difftime(Sys.time(), start_time)

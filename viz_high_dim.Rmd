@@ -32,12 +32,14 @@ This notebook visualizes the simulation results in
 #results_folder <- "results/highdim/binary3/" # shows differences
 #results_folder <- "results/highdim/binary/" 
 #results_folder <- "results/highdim/regression/expected/" 
-results_folder <- "results/highdim/binary/miss_prop_widen/" 
+# results_folder <- "results/highdim/binary/miss_prop_widen/" 
 #results_folder <- "results/highdim/binary/prop_widen" 
 
 #results_folder <- "results/highdim/regression/prop_widen/misspec/" 
 
-#results_folder <- "results/highdim/regression/prop_widen/cor/" 
+#results_folder <- "results/highdim/regression/prop_widen/cor/
+
+results_folder <- "results/paper/misspec/" 
 
   
 results <- readRDS(glue::glue(results_folder,"results.Rds"))

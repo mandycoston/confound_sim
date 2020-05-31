@@ -99,14 +99,19 @@ This notebook visualizes the simulation results that vary with a variable: var_p
 # img_folder <- "img/vary_zeta_"
 
 # Vary p, q, gamma zeta for m = 0 and m = 0.25
-results_folder <- "results/paper/vary_p_q_gamma_zeta/"
+# results_folder <- "results/paper/vary_p_q_gamma_zeta/"
+# var_param <- quo(p)
+# img_folder <- "img/vary_p_q_gamma_zeta_"
+
+results_folder <- "results/paper/no_split/"
 var_param <- quo(p)
-img_folder <- "img/vary_p_q_gamma_zeta_"
+img_folder <- "img/no_split_zeta_"
 
 fl = list.files(results_folder, pattern = ".results.")
 setwd(results_folder)
 results <- bind_rows(lapply(fl, readRDS))
 
+results %>% filter(zeta == 20) -> results
 ```
 
 ```{r}
@@ -270,7 +275,7 @@ for zeta = 30, 45 error blows up when coefficient in mu model is 10 (resp at -0.
 
 ```{R fig.width = 5, fig.height = 4}
 results %>%
-  dplyr::filter(m == 0.25) %>%
+  #dplyr::filter(m == 0.25) %>%
   dplyr::group_by(!! var_param, method) %>%
   dplyr::filter(! (method %in% c("Oracle DR"))) %>%
   dplyr::summarise(
@@ -287,8 +292,8 @@ results %>%
   scale_color_manual(values = cbPalette[1:4])+
   theme_bw(base_size = 21) +
    theme(legend.position = c(0.8, 0.24), legend.title = element_blank())
-
-ggsave(glue::glue(img_folder, "m25_varyp.pdf"), width =5, height = 4)
+# 
+# ggsave(glue::glue(img_folder, "m25_varyp.pdf"), width =5, height = 4)
 ```
 
 
