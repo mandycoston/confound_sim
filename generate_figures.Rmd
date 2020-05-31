@@ -10,6 +10,7 @@ library(tidyverse)
 library(latex2exp)
 #library(plotly)
 source("plot_utils.R")
+library(xtable) # for converting dataframes to latex 
 
 rename_methods <- function(df) {
   return(mutate(df,method = factor(recode(method,
@@ -28,7 +29,7 @@ rename_methods <- function(df) {
 ```{r}
 results_folder <- "results/paper/vary_zeta_fix_gamma/"
 var_param <- quo(m)
-img_folder <- "img/paper/vary_rho_"
+
 
 fl = list.files(results_folder, pattern = ".results.")
 setwd(results_folder)
@@ -38,7 +39,8 @@ results <- bind_rows(lapply(fl, readRDS)) %>% rename_methods()
 
 
 ```{r}
-z <- 25
+img_folder <- "img/paper/cor/vary_rho_"
+z <- 15
 alg <- "LASSO"
 results %>%
   dplyr::filter(zeta == z, algorithm == alg) %>%
@@ -53,6 +55,7 @@ results %>%
   geom_errorbar(aes(ymin = low, ymax = high), width = 0.1) +
   ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
 xlab(TeX("$\\rho_{V_i, Z_i}$")) +
+  ylim(c(4,20)) + 
   scale_color_manual(values = cbPalette) +
   theme_bw(base_size = 18) +
   theme(legend.position = "none", legend.title = element_blank())
@@ -65,7 +68,7 @@ ggsave(glue::glue(img_folder, "{alg}_zeta{z}.pdf"), width = 8, height = 8)
 ```{r}
 results_folder <- "results/paper/vary_p_q/"
 var_param <- quo(p)
-img_folder <- "img/vary_p_q_"
+img_folder <- "img/paper/vary_p_q_"
 
 
 fl = list.files(results_folder, pattern = ".results.")
@@ -102,6 +105,7 @@ ggsave(glue::glue(img_folder, "varyp_m0_lasso.pdf"), width =5, height = 4)
 > lasso correlated
 
 ```{r}
+img_folder <- "img/paper/cor/vary_p_q_"
 results %>%
    dplyr::filter(m == 0.25, algorithm == "LASSO") %>%
   dplyr::group_by(!! var_param, method) %>%
@@ -117,16 +121,18 @@ results %>%
   ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
  scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
  xlab(TeX("$d_v$")) +
+   ylim(c(4,20)) +
   scale_color_manual(values = cbPalette[1:4])+
   theme_bw(base_size = 21) +
-   theme(legend.position = "bottom", legend.title = element_blank())
+   theme(legend.position = "none", legend.title = element_blank())
 
-ggsave(glue::glue(img_folder, "varyp_m25_lasso.pdf"), width =5, height = 4)
+ggsave(glue::glue(img_folder, "_lasso.pdf"), width =8, height = 8)
 ```
 
 > RF uncorrelated 
 
 ```{r}
+img_folder <- "img/paper/vary_p_q_"
 results %>%
    dplyr::filter(m == 0, algorithm == "RF") %>%
   dplyr::group_by(!! var_param, method) %>%
@@ -146,7 +152,7 @@ results %>%
   theme_bw(base_size = 21) +
    theme(legend.position = "bottom", legend.title = element_blank())
 
-ggsave(glue::glue(img_folder, "varyp_m0_rf.pdf"), width =5, height = 4)
+#ggsave(glue::glue(img_folder, "varyp_m0_rf.pdf"), width =5, height = 4)
 ```
 
 > RF correlated
@@ -171,7 +177,7 @@ results %>%
   theme_bw(base_size = 21) +
    theme(legend.position = "bottom", legend.title = element_blank())
 
-ggsave(glue::glue(img_folder, "varyp_m25_rf.pdf"), width =5, height = 4)
+#ggsave(glue::glue(img_folder, "varyp_m25_rf.pdf"), width =5, height = 4)
 ```
 
 # Vary zeta for fixed, p, q, gamma 
@@ -183,12 +189,14 @@ ggsave(glue::glue(img_folder, "varyp_m25_rf.pdf"), width =5, height = 4)
 #results_folder <- "results/paper/vary_zeta_fix_gamma_rho25/"
 results_folder <- "results/paper/vary_zeta_fix_gamma/"
 var_param <- quo(zeta)
-img_folder <- "img/rho25_"
+img_folder <- "img/paper/cor/"
 
 fl = list.files(results_folder, pattern = ".results.")
 setwd(results_folder)
 results <- bind_rows(lapply(fl, readRDS)) %>% rename_methods()
+```
 
+```{r}
 results %>%
   dplyr::filter(m == 0.25, algorithm == "LASSO") %>%
   dplyr::group_by(!! var_param, method) %>%
@@ -203,12 +211,11 @@ results %>%
   ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
  scale_x_continuous(breaks = seq(0, 50, 5), minor_breaks = seq(0, 50, 5)) +
 xlab(TeX("$k_{\\mu,z}$")) +
+    ylim(c(4,20)) +
   scale_color_manual(values = cbPalette) +
   theme_bw(base_size = 20) +
-  theme(legend.position = "bottom", legend.title = element_blank())
-
-
-#ggsave(glue::glue(img_folder, "vary_zeta.pdf"), width = 10, height = 8)
+  theme(legend.position = "none", legend.title = element_blank()) 
+ggsave(glue::glue(img_folder, "vary_zeta.pdf"), width = 8, height = 8)
 ```
 
 
@@ -280,3 +287,46 @@ xlab(TeX("$k_{\\mu,z}$")) +
 
 #ggsave(glue::glue(img_folder, "vary_zeta.pdf"), width = 10, height = 8)
 ```
+
+> misspecified
+
+```{r}
+results_folder <- "results/paper/misspec/"
+img_folder <- "img/misspec_"
+
+results <- readRDS(glue::glue(results_folder, "results.Rds")) %>% rename_methods()
+results$spec <- "misspecified"
+
+results_c <- readRDS(glue::glue(results_folder, "compare_p400_mhash200results.Rds")) %>% rename_methods()
+results_c$spec <- "correctly_specified"
+
+results <- rbind(select(results_c, mse, method, sim, spec), results)
+
+results %>%
+  dplyr::group_by(method, spec) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = method, y = mmse, color = spec)) +
+  geom_point(size = 1.45) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 1.0) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  scale_color_manual(values = cbPalette) +
+  theme_bw(base_size = 20) +
+  theme(legend.position = "bottom", legend.title = element_blank())
+
+results %>%
+  dplyr::group_by(method, spec) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>% 
+  pivot_wider(names_from = spec, values_from = mmse:high) %>%
+  select(method, mmse_correctly_specified, low_correctly_specified,  high_correctly_specified, 
+         mmse_misspecified, low_misspecified, high_misspecified) %>%
+  xtable(caption = "MSE of methods when we have misspecification in the second-stage learning procedures versus when the second-stage is correctly specified. The errors are higher for all methods under misspecification.In both settings our proposed DR method has the lowest MSE", label = "fig:mse_misspec")
+```
+

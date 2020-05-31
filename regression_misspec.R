@@ -9,7 +9,7 @@ start_time <- Sys.time()
 set.seed(100)
 results <- tibble()
 n <- 4 * 1000
-n_sim <- 3
+n_sim <- 500
 d <- 500
 q <- 100 #20 # dimension of hidden confounder z
 p <- d - q # dimension of v
@@ -22,7 +22,7 @@ alpha <- alpha_z + alpha_v
 s <- sort(rep(1:4, n / 4))
 
 # parallelize
-registerDoParallel(cores = 14)
+registerDoParallel(cores = 48)
 
 results <- foreach (sim_num = 1:n_sim) %dopar% {
   v_first_order <- matrix(rnorm(n * p/2), n, p/2)
