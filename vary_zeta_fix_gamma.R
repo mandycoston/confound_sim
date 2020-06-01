@@ -6,7 +6,7 @@ source("utils.R")
 
 # This script varies zeta and beta, holding gamma, alpha, p, d, q fixed.
 #results_folder <- "results/highdim/regression/prop_widen/cor/varyparams/vary_zeta_fix_gamma_rho25/"
-results_folder <- "results/paper/vary_zeta_p100/"
+results_folder <- "results/paper/vary_zeta_p250/"
 start_time <- Sys.time()
 set.seed(100)
 
@@ -16,14 +16,14 @@ registerDoParallel(cores = 48)
 for (zeta in seq(0, 50, 5)) {
   if(zeta %in% c(15, 20)) {
     pho_vals <- seq(-0.5, 1, 0.25)  }
-  if(!(zeta %in% c(15, 20, 25))) {
+  if(!(zeta %in% c(15, 20))) {
     pho_vals <- c(0, 0.25)  }
   for (m in  pho_vals) {
     results <- tibble()
     n <- 4 * 1000
     n_sim <- 500
     d <- 500
-    p <- 100
+    p <- 250
     q <- d - p
     gamma <- 25 # number of non-zero predictors in v
     beta <- gamma + zeta

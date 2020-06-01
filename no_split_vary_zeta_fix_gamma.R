@@ -11,9 +11,9 @@ set.seed(100)
 
 registerDoParallel(cores = 48)
 
-for (zeta in seq(0, 50, 5)) {
+for (zeta in c(20)) {
   n <- 4 * 1000
-  n_sim <- 500
+  n_sim <- 48*2
   d <- 500
   p <- 400
   q <- d - p
