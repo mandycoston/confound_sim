@@ -39,23 +39,27 @@ This notebook visualizes the simulation results in
 
 #results_folder <- "results/highdim/regression/prop_widen/cor/
 
-results_folder <- "results/paper/misspec/" 
-
-  
-results <- readRDS(glue::glue(results_folder,"results.Rds"))
-parameters <- readRDS(glue::glue(results_folder, "parameters.Rds"))
+# results_folder <- "results/paper/misspec/" 
+# 
+#   
+# results <- readRDS(glue::glue(results_folder,"results.Rds"))
+# parameters <- readRDS(glue::glue(results_folder, "parameters.Rds"))
 
 #img_folder <- "img/regression_"
 #img_folder <- "img/binary_"
 img_folder <- "img/test_"
 
+results_folder <- "results/paper/rf/vary_zeta_p400/" 
+
+  
+results <- readRDS(glue::glue(results_folder,"double_train_confzeta0_mhash200results.Rds"))
+
+
+
 
 
 ```
 
-```{r}
-parameters
-```
 
 ```{r}
 results %>%
@@ -68,9 +72,7 @@ results %>%
     high = mean(mse) + 1.96 * sqrt(var(mse) / n()), 
   ) 
 ```
-```{r}
-parameters
-```
+
 ```{r}
 summary(results)
 ```

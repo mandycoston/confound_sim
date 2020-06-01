@@ -1,0 +1,223 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Code for uncorrelated figures
+
+```{r}
+library(tidyverse)
+library(latex2exp)
+#library(plotly)
+source("plot_utils.R")
+library(xtable) # for converting dataframes to latex 
+
+rename_methods <- function(df) {
+  return(mutate(df,method = factor(recode(method,
+                                bc = "DR",
+                                conf = "TCR",
+                                pl = "PL"),
+                levels = rev(c(
+                           "DR",
+                           "PL",
+                           "TCR")))))
+}
+```
+
+# Vary p, q, but fix gamma and zeta for m = 0 
+
+```{r}
+results_folder <- "results/paper/rf/vary_p_q/"
+var_param <- quo(p)
+img_folder <- "img/paper/rf_vary_p_q_"
+
+
+fl = list.files(results_folder, pattern = ".results.")
+setwd(results_folder)
+results <- bind_rows(lapply(fl, readRDS)) %>% rename_methods()
+
+```
+
+```{R}
+results %>%
+  dplyr::filter(m == 0, algorithm == "RF") %>%
+  dplyr::group_by(!! var_param, method) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+   ggplot(aes(x = !!var_param, y = mmse, color = method)) +
+  geom_point(size = 1.5) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
+  ylab("") + 
+ ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
+  xlab(TeX("$d_v$")) +
+  scale_color_manual(values = cbPalette[1:4]) +
+  theme_bw(base_size = 21) +
+  theme(legend.position = "bottom", legend.title = element_blank())
+
+
+ggsave(glue::glue(img_folder, ".pdf"), width = 8, height = 8)
+```
+
+
+# Vary zeta for fixed, p, q, gamma 
+
+> 250p
+
+```{r}
+results_folder <- "results/paper/rf/vary_zeta_p250/"
+var_param <- quo(zeta)
+img_folder <- "img/paper/rf_vary_zeta"
+
+fl <- list.files(results_folder, pattern = ".results.")
+setwd(results_folder)
+results <- bind_rows(lapply(fl, readRDS)) %>% rename_methods()
+```
+
+>uncorrelated 250p 
+
+```{r}
+results %>%
+  dplyr::filter(m == 0, algorithm == "RF") %>%
+  dplyr::group_by(!!var_param, method) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !!var_param, y = mmse, color = method)) +
+  geom_point(size = 1.75) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 1.42) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  scale_x_continuous(breaks = seq(0, 50, 5), minor_breaks = seq(0, 50, 5)) +
+  xlab(TeX("$k_{\\mu,z}$")) +
+  scale_color_manual(values = cbPalette) +
+  theme_bw(base_size = 21) +
+  theme(legend.position = "none", legend.title = element_blank())
+ggsave(glue::glue(img_folder, "vary_zeta.pdf"), width = 8, height = 8)
+```
+
+> correlated 250 p
+
+```{r}
+results %>%
+  dplyr::filter(m == 0.25, algorithm == "RF") %>%
+  dplyr::group_by(!!var_param, method) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !!var_param, y = mmse, color = method)) +
+  geom_point(size = 1.75) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 1.42) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  scale_x_continuous(breaks = seq(0, 50, 5), minor_breaks = seq(0, 50, 5)) +
+  xlab(TeX("$k_{\\mu,z}$")) +
+  scale_color_manual(values = cbPalette) +
+  theme_bw(base_size = 21) +
+  theme(legend.position = "none", legend.title = element_blank())
+#ggsave(glue::glue(img_folder, "vary_zeta.pdf"), width = 8, height = 8)
+```
+
+> 400p
+
+```{r}
+results_folder <- "results/paper/rf/vary_zeta_p400/"
+var_param <- quo(zeta)
+img_folder <- "img/paper/rf_vary_zeta_400p"
+
+fl <- list.files(results_folder, pattern = ".results.")
+setwd(results_folder)
+results <- bind_rows(lapply(fl, readRDS)) %>% rename_methods()
+```
+
+>uncorrelated 400p 
+
+```{r}
+results %>%
+  dplyr::filter(m == 0, algorithm == "RF") %>%
+  dplyr::group_by(!!var_param, method) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !!var_param, y = mmse, color = method)) +
+  geom_point(size = 1.75) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 1.42) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  scale_x_continuous(breaks = seq(0, 50, 5), minor_breaks = seq(0, 50, 5)) +
+  xlab(TeX("$k_{\\mu,z}$")) +
+  scale_color_manual(values = cbPalette) +
+  theme_bw(base_size = 21) +
+  theme(legend.position = "none", legend.title = element_blank())
+ggsave(glue::glue(img_folder, "vary_zeta.pdf"), width = 8, height = 8)
+```
+
+> correlated 400 p
+
+```{r}
+results %>%
+  dplyr::filter(m == 0.25, algorithm == "RF") %>%
+  dplyr::group_by(!!var_param, method) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !!var_param, y = mmse, color = method)) +
+  geom_point(size = 1.75) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 1.42) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  scale_x_continuous(breaks = seq(0, 50, 5), minor_breaks = seq(0, 50, 5)) +
+  xlab(TeX("$k_{\\mu,z}$")) +
+  scale_color_manual(values = cbPalette) +
+  theme_bw(base_size = 21) +
+  theme(legend.position = "none", legend.title = element_blank())
+```
+
+
+# correlation coefficient for p = 250
+
+```{r}
+results_folder <- "results/paper/rf/vary_zeta_p250/"
+var_param <- quo(m)
+
+
+fl <- list.files(results_folder, pattern = ".results.")
+setwd(results_folder)
+results <- bind_rows(lapply(fl, readRDS)) %>% rename_methods()
+```
+
+
+```{r}
+img_folder <- "img/paper/cor/rf/vary_rho_"
+z <- 15
+alg <- "RF"
+results %>%
+  dplyr::filter(zeta == z, algorithm == alg) %>%
+  dplyr::group_by(!!var_param, method) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !!var_param, y = mmse, color = method)) +
+  geom_point(size = 1.5) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 0.0428) +
+  #ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  ylab("") +
+  xlab(TeX("$\\rho_{V_i, Z_i}$")) +
+  scale_color_manual(values = cbPalette) +
+  theme_bw(base_size = 21) +
+  theme(legend.position = "none", legend.title = element_blank())
+
+#ggsave(glue::glue(img_folder, "{alg}_zeta{z}.pdf"), width = 8, height = 8)
+```
+
+
+
