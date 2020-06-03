@@ -103,20 +103,23 @@ This notebook visualizes the simulation results that vary with a variable: var_p
 # var_param <- quo(p)
 # img_folder <- "img/vary_p_q_gamma_zeta_"
 
-results_folder <- "results/paper/no_split/"
+# results_folder <- "results/paper/easy_no_split/"
+# var_param <- quo(p)
+# img_folder <- "img/no_split_zeta_"
+
+results_folder <- "results/paper/rf_new_config/"
 var_param <- quo(p)
-img_folder <- "img/no_split_zeta_"
+img_folder <- "rf_test_"
 
 fl = list.files(results_folder, pattern = ".results.")
 setwd(results_folder)
 results <- bind_rows(lapply(fl, readRDS))
 
-results %>% filter(zeta == 20) -> results
 ```
 
 ```{r}
 results %>%
-  dplyr::group_by(!! var_param, method) %>%
+  dplyr::group_by(!! var_param, method, algorithm) %>%
   dplyr::summarise(
     mmse = mean(mse),
     count = n(),
@@ -249,7 +252,7 @@ for zeta = 30, 45 error blows up when coefficient in mu model is 10 (resp at -0.
 # var_param <- quo(zeta)
 # 
 # results %>%
-#   dplyr::group_by(!! var_param, method) %>%
+#   dplyr::group_by(!! var_param, method, algorithm) %>%
 #   dplyr::filter(!(method %in% c("Oracle DR"))) %>%
 #   dplyr::summarise(
 #     mmse = mean(mse),
@@ -263,9 +266,10 @@ for zeta = 30, 45 error blows up when coefficient in mu model is 10 (resp at -0.
 #  scale_x_continuous(breaks = seq(0, 50, 5), minor_breaks = seq(0, 50, 5)) +
 # xlab(TeX("$k_{\\mu,z}$")) +
 #   scale_color_manual(values = cbPalette) +
+#   facet_grid(.~algorithm) + 
 #   theme_bw(base_size = 20) +
 #   theme(legend.position = c(0.87, 0.21), legend.title = element_blank())
-# 
+
 # 
 # ggsave(glue::glue(img_folder, "vary_zeta.pdf"), width = 10, height = 8)
 ```
@@ -276,7 +280,7 @@ for zeta = 30, 45 error blows up when coefficient in mu model is 10 (resp at -0.
 ```{R fig.width = 5, fig.height = 4}
 results %>%
   #dplyr::filter(m == 0.25) %>%
-  dplyr::group_by(!! var_param, method) %>%
+  dplyr::group_by(!! var_param, method, algorithm) %>%
   dplyr::filter(! (method %in% c("Oracle DR"))) %>%
   dplyr::summarise(
     mmse = mean(mse),
@@ -289,11 +293,12 @@ results %>%
   ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
  scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
  xlab(TeX("$d_v$")) +
+  facet_grid(algorithm ~. ) + 
   scale_color_manual(values = cbPalette[1:4])+
   theme_bw(base_size = 21) +
    theme(legend.position = c(0.8, 0.24), legend.title = element_blank())
-# 
-# ggsave(glue::glue(img_folder, "m25_varyp.pdf"), width =5, height = 4)
+
+ggsave(glue::glue(img_folder, "m25_varyp.pdf"), width =5, height = 4)
 ```
 
 

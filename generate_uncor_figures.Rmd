@@ -3,46 +3,55 @@ title: "R Notebook"
 output: html_notebook
 ---
 
-Code for uncorrelated figures
+Code for figures in main paper 
 
 ```{r}
 library(tidyverse)
 library(latex2exp)
-#library(plotly)
+# library(plotly)
 source("plot_utils.R")
-library(xtable) # for converting dataframes to latex 
+library(xtable) # for converting dataframes to latex
 
 rename_methods <- function(df) {
-  return(mutate(df,method = factor(recode(method,
-                                bc = "DR",
-                                conf = "TCR",
-                                pl = "PL"),
-                levels = rev(c(
-                           "DR",
-                           "PL",
-                           "TCR")))))
+  return(mutate(df, method = factor(recode(method,
+    bc = "DR",
+    conf = "TCR",
+    pl = "PL"
+  ),
+  levels = rev(c(
+    "DR",
+    "PL",
+    "TCR"
+  ))
+  )))
 }
 ```
 
-# Vary p, q, but fix gamma and zeta for m = 0 
+# correlation coefficient
 
 ```{r}
-results_folder <- "results/paper/vary_p_q/"
-var_param <- quo(p)
-img_folder <- "img/paper/uncor/vary_p_q_"
+results_folder <- "results/paper/no_split/"
+var_param <- quo(m)
 
 
-fl = list.files(results_folder, pattern = ".results.")
+fl <- list.files(results_folder, pattern = ".results.")
 setwd(results_folder)
 results <- bind_rows(lapply(fl, readRDS)) %>% rename_methods()
-
 ```
 
-> lasso uncorrelated
+
+
+# Vary p, q, but fix gamma and zeta 
 
 ```{r}
+var_param <- quo(p)
+img_folder <- "img/paper/uncor/vary_p_q_"
+z <- 20
+alg <- "LASSO"
 results %>%
-   dplyr::filter(m == 0, algorithm == "LASSO") %>%
+   dplyr::filter(m == 0, 
+                 algorithm == alg,
+                 zeta == z) %>%
   dplyr::group_by(!! var_param, method) %>%
   dplyr::filter(! (method %in% c("Oracle DR"))) %>%
   dplyr::summarise(
@@ -53,93 +62,100 @@ results %>%
   ggplot(aes(x = !! var_param, y = mmse, color = method)) +
   geom_point(size = 1.5) +
   geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
-  ylab("") +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
  scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
  xlab(TeX("$d_v$")) +
   scale_color_manual(values = cbPalette[1:4])+
   theme_bw(base_size = 21) +
-   ylim(c(4,40)) + 
    theme(legend.position = "none", legend.title = element_blank())
 
-ggsave(glue::glue(img_folder, "varyp_m0_lasso.pdf"), width =8, height = 8)
+ggsave(glue::glue(img_folder, "zeta{z}_{alg}.pdf"), width =8, height = 8)
 ```
 
 
+```{r}
+var_param <- quo(p)
+z <- 20
+alg <- "RF"
+results %>%
+   dplyr::filter(m == 0, 
+                 algorithm == alg,
+                 zeta == z) %>%
+  dplyr::group_by(!! var_param, method) %>%
+  dplyr::filter(! (method %in% c("Oracle DR"))) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
+  geom_point(size = 1.5) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+ scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
+ xlab(TeX("$d_v$")) +
+  scale_color_manual(values = cbPalette[1:4])+
+  theme_bw(base_size = 21) +
+   theme(legend.position = "none", legend.title = element_blank())
 
-
+ggsave(glue::glue(img_folder, "zeta{z}_{alg}.pdf"), width =8, height = 8)
+```
 
 # Vary zeta for fixed, p, q, gamma 
 
-> uncorrelated LASSO
 
-```{R}
-
-# Vary zeta/alphaz for rho = 0 (uncorrelated)
-results_folder <- "results/paper/vary_zeta_fix_gamma/"
-var_param <- quo(zeta)
-img_folder <- "img/paper/uncor/"
-
-fl = list.files(results_folder, pattern = ".results.")
-setwd(results_folder)
-results <- bind_rows(lapply(fl, readRDS)) %>% rename_methods()
-```
+> correlated LASSO
 
 ```{r}
+var_param <- quo(zeta)
+img_folder <- "img/paper/uncor/vary_zeta"
+alg <- "LASSO"
+p <- 400
 results %>%
-  dplyr::filter(m == 0, algorithm == "LASSO") %>%
-  dplyr::group_by(!! var_param, method) %>%
+  dplyr::filter(p == p, 
+                algorithm == alg, 
+                m == 0) %>%
+  dplyr::group_by(!!var_param, method) %>%
   dplyr::summarise(
     mmse = mean(mse),
     low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
     high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
   ) %>%
-  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
-  geom_point(size = 1.5) +
-  geom_errorbar(aes(ymin = low, ymax = high), width = 1.43) +
-  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
- scale_x_continuous(breaks = seq(0, 50, 5), minor_breaks = seq(0, 50, 5)) +
-xlab(TeX("$k_{\\z}$")) +
-  scale_color_manual(values = cbPalette) +
-  theme_bw(base_size = 20) +
-   ylim(c(4,40)) + 
-  theme(legend.position = "none", legend.title = element_blank())
-ggsave(glue::glue(img_folder, "vary_zeta_lasso.pdf"), width = 8, height = 8)
-```
-
-> RF
-
-```{r}
-# Vary zeta/alphaz for rho = .25 correlated
-#results_folder <- "results/paper/vary_zeta_fix_gamma_rho25/"
-results_folder <- "results/paper/vary_zeta_fix_gamma/"
-var_param <- quo(zeta)
-img_folder <- "img/paper/uncor/"
-
-fl = list.files(results_folder, pattern = ".results.")
-setwd(results_folder)
-results <- bind_rows(lapply(fl, readRDS)) %>% rename_methods()
-```
-
-```{R}
-results %>%
-  dplyr::filter(m == 0, algorithm == "RF") %>%
-  dplyr::group_by(!! var_param, method) %>%
-  dplyr::summarise(
-    mmse = mean(mse),
-    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
-    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
-  ) %>%
-  ggplot(aes(x = !! var_param, y = mmse, color = method)) +
-  geom_point(size = 1.5) +
+  ggplot(aes(x = !!var_param, y = mmse, color = method)) +
+  geom_point(size = 1.75) +
   geom_errorbar(aes(ymin = low, ymax = high), width = 1.42) +
-  ylab("") +
- scale_x_continuous(breaks = seq(0, 50, 5), minor_breaks = seq(0, 50, 5)) +
-xlab(TeX("$k_{\\z}$")) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  scale_x_continuous(breaks = seq(0, 60, 10), minor_breaks = seq(0, 60, 10)) +
+  xlab(TeX("$k_z$")) +
   scale_color_manual(values = cbPalette) +
-  theme_bw(base_size = 20) +
-  ylim(c(4,40)) + 
+  theme_bw(base_size = 21) +
   theme(legend.position = "none", legend.title = element_blank())
+ggsave(glue::glue(img_folder, "_p{p}_{alg}.pdf"), width = 8, height = 8)
+```
 
-
-ggsave(glue::glue(img_folder, "vary_zeta_RF.pdf"), width = 8, height = 8)
+```{r}
+var_param <- quo(zeta)
+img_folder <- "img/paper/uncor/vary_zeta"
+alg <- "RF"
+p <- 400
+results %>%
+  dplyr::filter(p == p, 
+                algorithm == alg, 
+                m == 0) %>%
+  dplyr::group_by(!!var_param, method) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = !!var_param, y = mmse, color = method)) +
+  geom_point(size = 1.75) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 1.42) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  scale_x_continuous(breaks = seq(0, 60, 10), minor_breaks = seq(0, 60, 10)) +
+  xlab(TeX("$k_z$")) +
+  scale_color_manual(values = cbPalette) +
+  theme_bw(base_size = 21) +
+  theme(legend.position = "none", legend.title = element_blank())
+ggsave(glue::glue(img_folder, "_p{p}_{alg}.pdf"), width = 8, height = 8)
 ```

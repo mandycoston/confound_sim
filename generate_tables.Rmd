@@ -1,0 +1,69 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Code for table in main paper 
+
+```{r}
+library(tidyverse)
+library(latex2exp)
+#library(plotly)
+source("plot_utils.R")
+library(xtable) # for converting dataframes to latex 
+
+rename_methods <- function(df) {
+  return(mutate(df,method = factor(recode(method,
+                                bc = "DR",
+                                conf = "TCR",
+                                pl = "PL"),
+                levels = rev(c(
+                           "DR",
+                           "PL",
+                           "TCR")))))
+}
+```
+
+
+> misspecified
+
+```{r}
+results_folder <- "results/paper/misspec/"
+img_folder <- "img/misspec_"
+
+results <- readRDS(glue::glue(results_folder, "results.Rds")) %>% rename_methods()
+results$spec <- "misspecified"
+
+results_c <- readRDS(glue::glue(results_folder , "compare_p400_zeta20_mhash200results.Rds")) %>% rename_methods()
+results_c$spec <- "correctly_specified"
+
+results <- rbind(select(results_c, colnames(results)), results) %>% filter(algorithm == "LASSO")
+
+results %>%
+  dplyr::group_by(method, spec) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>%
+  ggplot(aes(x = method, y = mmse, color = spec)) +
+  geom_point(size = 1.45) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 1.0) +
+  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  scale_color_manual(values = cbPalette) +
+  theme_bw(base_size = 20) +
+  theme(legend.position = "bottom", legend.title = element_blank())
+
+results %>%
+  dplyr::group_by(method, spec) %>%
+  dplyr::summarise(
+    mmse = mean(mse),
+    low = mean(mse) - 1.96 * sqrt(var(mse) / n()),
+    high = mean(mse) + 1.96 * sqrt(var(mse) / n()),
+  ) %>% 
+  pivot_wider(names_from = spec, values_from = mmse:high) %>%
+  select(method, mmse_correctly_specified, low_correctly_specified,  high_correctly_specified, 
+         mmse_misspecified, low_misspecified, high_misspecified) %>%
+  xtable(caption = "MSE of methods when the second-stage is correctly specified versus when we have misspecification in the second-stage learning procedures. 95 confidence intervals in parentheses. The errors are higher for all methods under misspecification. In both settings our proposed DR method has the lowest MSE, although the gain is much less under misspecification", label = "fig:mse_misspec")
+```
+
