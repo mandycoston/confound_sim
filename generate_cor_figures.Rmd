@@ -52,6 +52,7 @@ alg <- "LASSO"
 results %>%
   dplyr::filter(p == 400, 
                 zeta == z,
+                gamma == 25,
                 algorithm == alg) %>%
   dplyr::group_by(!!var_param, method) %>%
   dplyr::summarise(
@@ -61,12 +62,13 @@ results %>%
   ) %>%
   ggplot(aes(x = !!var_param, y = mmse, color = method)) +
   geom_point(size = 1.75) +
-  geom_errorbar(aes(ymin = low, ymax = high), width = 0.0428) +
-  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 0.0428, size = 1) +
+  ylab(TeX("")) +
   scale_x_continuous(breaks = seq(-0.5, 1, 0.25), minor_breaks = seq(-0.5, 1, 0.25)) +
   xlab(TeX("$\\rho$")) +
   scale_color_manual(values = cbPalette) +
-  theme_bw(base_size = 21) +
+ theme_bw(base_size = 30) +
+  ylim(c(3, 25)) + 
   theme(legend.position = "none", legend.title = element_blank())
 
 ggsave(glue::glue(img_folder, "{alg}_zeta{z}.pdf"), width = 8, height = 8)
@@ -79,6 +81,7 @@ alg <- "RF"
 results %>%
   dplyr::filter(p == 400, 
                 zeta == z,
+                gamma == 25,
                 algorithm == alg) %>%
   dplyr::group_by(!!var_param, method) %>%
   dplyr::summarise(
@@ -88,12 +91,12 @@ results %>%
   ) %>%
   ggplot(aes(x = !!var_param, y = mmse, color = method)) +
   geom_point(size = 1.75) +
-  geom_errorbar(aes(ymin = low, ymax = high), width = 0.0428) +
-  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 0.0428, size = 1) +
+  ylab(TeX("")) +
   scale_x_continuous(breaks = seq(-0.5, 1, 0.25), minor_breaks = seq(-0.5, 1, 0.25)) +
   xlab(TeX("$\\rho$")) +
   scale_color_manual(values = cbPalette) +
-  theme_bw(base_size = 21) +
+theme_bw(base_size = 30) +
   theme(legend.position = "none", legend.title = element_blank())
 
 ggsave(glue::glue(img_folder, "{alg}_zeta{z}.pdf"), width = 8, height = 8)
@@ -110,6 +113,7 @@ z <- 20
 alg <- "LASSO"
 results %>%
    dplyr::filter(m == 0.25, 
+                 gamma == 25,
                  algorithm == alg,
                  zeta == z) %>%
   dplyr::group_by(!! var_param, method) %>%
@@ -121,12 +125,13 @@ results %>%
   ) %>%
   ggplot(aes(x = !! var_param, y = mmse, color = method)) +
   geom_point(size = 1.5) +
-  geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
-  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 10, size = 1) +
+  ylab(TeX("")) +
  scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
  xlab(TeX("$d_v$")) +
   scale_color_manual(values = cbPalette[1:4])+
-  theme_bw(base_size = 21) +
+  theme_bw(base_size = 30) +
+  ylim(c(3, 25)) + 
    theme(legend.position = "none", legend.title = element_blank())
 
 ggsave(glue::glue(img_folder, "zeta{z}_{alg}.pdf"), width =8, height = 8)
@@ -139,6 +144,7 @@ z <- 20
 alg <- "RF"
 results %>%
    dplyr::filter(m == 0.25, 
+                 gamma == 25,
                  algorithm == alg,
                  zeta == z) %>%
   dplyr::group_by(!! var_param, method) %>%
@@ -150,12 +156,12 @@ results %>%
   ) %>%
   ggplot(aes(x = !! var_param, y = mmse, color = method)) +
   geom_point(size = 1.5) +
-  geom_errorbar(aes(ymin = low, ymax = high), width = 10) +
-  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 10, size = 1) +
+  ylab(TeX("")) +
  scale_x_continuous(breaks = seq(50, 450, 50), minor_breaks = seq(50, 450, 50)) +
  xlab(TeX("$d_v$")) +
   scale_color_manual(values = cbPalette[1:4])+
-  theme_bw(base_size = 21) +
+theme_bw(base_size = 30) +
    theme(legend.position = "none", legend.title = element_blank())
 
 ggsave(glue::glue(img_folder, "zeta{z}_{alg}.pdf"), width =8, height = 8)
@@ -170,10 +176,11 @@ ggsave(glue::glue(img_folder, "zeta{z}_{alg}.pdf"), width =8, height = 8)
 var_param <- quo(zeta)
 img_folder <- "img/paper/cor/vary_zeta"
 alg <- "LASSO"
-p <- 400
+#p <- 400
 results %>%
-  dplyr::filter(p == p, 
-                algorithm == alg, 
+  dplyr::filter(p == 400, 
+                algorithm == alg,
+                gamma == 25,
                 m == 0.25) %>%
   dplyr::group_by(!!var_param, method) %>%
   dplyr::summarise(
@@ -183,12 +190,13 @@ results %>%
   ) %>%
   ggplot(aes(x = !!var_param, y = mmse, color = method)) +
   geom_point(size = 1.75) +
-  geom_errorbar(aes(ymin = low, ymax = high), width = 1.42) +
-  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
-  scale_x_continuous(breaks = seq(0, 60, 10), minor_breaks = seq(0, 60, 10)) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 1.25, size = 1) +
+  ylab(TeX("")) +
+  scale_x_continuous(breaks = seq(0, 60, 5), minor_breaks = seq(0, 60, 5)) +
   xlab(TeX("$k_z$")) +
   scale_color_manual(values = cbPalette) +
-  theme_bw(base_size = 21) +
+  theme_bw(base_size = 30) +
+  ylim(c(3, 25)) + 
   theme(legend.position = "none", legend.title = element_blank())
 ggsave(glue::glue(img_folder, "_p{p}_{alg}.pdf"), width = 8, height = 8)
 ```
@@ -197,10 +205,11 @@ ggsave(glue::glue(img_folder, "_p{p}_{alg}.pdf"), width = 8, height = 8)
 var_param <- quo(zeta)
 img_folder <- "img/paper/cor/vary_zeta"
 alg <- "RF"
-p <- 400
+dv <- 400
 results %>%
-  dplyr::filter(p == p, 
+  dplyr::filter(p == dv, 
                 algorithm == alg, 
+                gamma == 25,
                 m == 0.25) %>%
   dplyr::group_by(!!var_param, method) %>%
   dplyr::summarise(
@@ -210,12 +219,12 @@ results %>%
   ) %>%
   ggplot(aes(x = !!var_param, y = mmse, color = method)) +
   geom_point(size = 1.75) +
-  geom_errorbar(aes(ymin = low, ymax = high), width = 1.42) +
-  ylab(TeX("$E\\[(\\nu(V) - \\hat{\\nu}(V))^2\\]$")) +
-  scale_x_continuous(breaks = seq(0, 60, 10), minor_breaks = seq(0, 60, 10)) +
+  geom_errorbar(aes(ymin = low, ymax = high), width = 1.25, size = 1) +
+  ylab(TeX("")) +
+  scale_x_continuous(breaks = seq(0, 60, 5), minor_breaks = seq(0, 60, 5)) +
   xlab(TeX("$k_z$")) +
   scale_color_manual(values = cbPalette) +
-  theme_bw(base_size = 21) +
+ theme_bw(base_size = 30) +
   theme(legend.position = "none", legend.title = element_blank())
-ggsave(glue::glue(img_folder, "_p{p}_{alg}.pdf"), width = 8, height = 8)
+ggsave(glue::glue(img_folder, "_p{dv}_{alg}.pdf"), width = 8, height = 8)
 ```

@@ -49,11 +49,10 @@ This notebook visualizes the simulation results in
 #img_folder <- "img/binary_"
 img_folder <- "img/test_"
 
-results_folder <- "results/paper/rf/vary_zeta_p400/" 
 
-  
-results <- readRDS(glue::glue(results_folder,"double_train_confzeta0_mhash200results.Rds"))
-
+# #cross-fitting
+# results_folder <- "results/paper/cross_fit/" 
+# results <- readRDS(glue::glue(results_folder,"p400_zeta20_mhash200results.Rds"))
 
 
 
@@ -63,7 +62,7 @@ results <- readRDS(glue::glue(results_folder,"double_train_confzeta0_mhash200res
 
 ```{r}
 results %>%
-  dplyr::group_by(method) %>%
+  dplyr::group_by(method,algorithm) %>%
   dplyr::summarise(
     mmse = mean(mse),
     count = n(),
@@ -98,7 +97,7 @@ results %>%
                            "PL",
                            "BTR"))))-> results
 results %>%
-  dplyr::group_by(method) %>%
+  dplyr::group_by(method, algorithm) %>%
   dplyr::filter(!(method %in% c("bc_true_prop",
                   "bc_true_mu",
                   "bc_rt_true_mu",
